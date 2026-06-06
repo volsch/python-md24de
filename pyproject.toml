@@ -64,6 +64,7 @@ testpaths = ["tests"]
 [tool.coverage.run]
 source = ["src/md24de"]
 branch = true
+relative_files = true
 
 [tool.coverage.report]
 show_missing = true
