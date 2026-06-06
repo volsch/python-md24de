@@ -1,3 +1,7 @@
+# Update pinned action SHAs with:
+#   gh api repos/actions/checkout/git/ref/tags/v6 --jq '.object.sha'
+#   gh api repos/actions/setup-python/git/ref/tags/v6 --jq '.object.sha'
+#   gh api repos/SonarSource/sonarcloud-github-action/git/ref/tags/v3 --jq '.object.sha'
 name: CI
 
 on:
@@ -15,12 +19,12 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0  # required for SonarCloud blame info
 
       - name: Set up Python 3.13
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.13"
 
@@ -43,6 +47,6 @@ jobs:
 
       - name: SonarCloud scan
         if: ${{ env.SONAR_TOKEN != '' }}
-        uses: SonarSource/sonarcloud-github-action@v3
+        uses: SonarSource/sonarcloud-github-action@383f7e52eae3ab0510c3cb0e7d9d150bbaeab838 # v3
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
