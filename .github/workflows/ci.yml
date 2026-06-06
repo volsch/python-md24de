@@ -1,7 +1,7 @@
 # Update pinned action SHAs with:
 #   gh api repos/actions/checkout/git/ref/tags/v6 --jq '.object.sha'
 #   gh api repos/actions/setup-python/git/ref/tags/v6 --jq '.object.sha'
-#   gh api repos/SonarSource/sonarcloud-github-action/git/ref/tags/v3 --jq '.object.sha'
+#   gh api repos/SonarSource/sonarcloud-github-action/git/ref/tags/v5 --jq '.object.sha'
 name: CI
 
 on:
@@ -47,6 +47,6 @@ jobs:
 
       - name: SonarCloud scan
         if: ${{ env.SONAR_TOKEN != '' }}
-        uses: SonarSource/sonarcloud-github-action@383f7e52eae3ab0510c3cb0e7d9d150bbaeab838 # v3
+        uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
