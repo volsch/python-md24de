@@ -3,8 +3,8 @@
 [![Latest release](https://img.shields.io/github/v/release/volsch/python-md24de?label=latest)](https://github.com/volsch/python-md24de/releases/latest)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=volsch_python-md24de&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=volsch_python-md24de)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=volsch_python-md24de&metric=coverage)](https://sonarcloud.io/summary/new_code?id=volsch_python-md24de)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=volsch_python-md24de&metric=alert_status)](https://sonarcloud.io/summary/overall?id=volsch_python-md24de)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=volsch_python-md24de&metric=coverage)](https://sonarcloud.io/summary/overall?id=volsch_python-md24de)
 
 Unofficial Python client library for the [messdienst24.de](https://messdienst24.de) utility-consumption portal.
 Provides typed, programmatic access to heating and hot-water consumption data and PDF document download.
