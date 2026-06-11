@@ -12,8 +12,12 @@ on:
 
 jobs:
   test:
-    name: Test
+    name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
 
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -23,10 +27,10 @@ jobs:
         with:
           fetch-depth: 0  # required for SonarCloud blame info
 
-      - name: Set up Python 3.13
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: pip install -e ".[dev]"
@@ -35,18 +39,21 @@ jobs:
         run: pytest --cov --cov-report=xml
 
       - name: Type check
+        if: matrix.python-version == '3.13'
         run: pyright src/
 
       - name: Lint
+        if: matrix.python-version == '3.13'
         run: ruff check src/ tests/
 
       - name: License check
+        if: matrix.python-version == '3.13'
         run: |
           pip-licenses --format=plain --order=license \
             --allow-only="MIT License;MIT;BSD License;BSD-2-Clause;BSD-3-Clause;Apache Software License;Apache-2.0;Apache-2.0 OR BSD-2-Clause;Mozilla Public License 2.0 (MPL 2.0);PSF-2.0;Python Software Foundation License"
 
       - name: SonarCloud scan
-        if: ${{ env.SONAR_TOKEN != '' }}
+        if: ${{ matrix.python-version == '3.13' && env.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}

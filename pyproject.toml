@@ -7,7 +7,7 @@ name = "python-md24de"
 version = "0.1.0"
 description = "Unofficial Python client library for the messdienst24.de portal"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "Volker Schmidt" }]
 keywords = ["md24de", "messdienst24", "energy", "consumption", "utility", "heating"]
@@ -16,6 +16,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
@@ -49,7 +50,7 @@ venvPath = "."
 venv = ".venv"
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]

@@ -5,8 +5,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
-      day: sunday
-      time: "19:00"
+      day: saturday
+      time: "18:00"
     open-pull-requests-limit: 5
     groups:
       dev-dependencies:
@@ -20,5 +20,5 @@ updates:
     directory: /
     schedule:
       interval: weekly
-      day: sunday
-      time: "19:00"
+      day: saturday
+      time: "18:00"
