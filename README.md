@@ -1,7 +1,7 @@
 # python-md24de
 
 [![Latest release](https://img.shields.io/github/v/release/volsch/python-md24de?label=latest)](https://github.com/volsch/python-md24de/releases/latest)
-[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=volsch_python-md24de&metric=alert_status)](https://sonarcloud.io/summary/overall?id=volsch_python-md24de)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=volsch_python-md24de&metric=coverage)](https://sonarcloud.io/summary/overall?id=volsch_python-md24de)
@@ -24,7 +24,7 @@ Provides typed, programmatic access to heating and hot-water consumption data an
 - Download the monthly PDF document
 - Fully typed — passes **pyright strict** with zero errors
 - Minimal dependencies: `httpx`, `beautifulsoup4`, `lxml`, `json5`
-- Python 3.13+
+- Python 3.12+
 
 ## Installation
 
