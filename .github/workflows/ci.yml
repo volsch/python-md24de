@@ -56,7 +56,7 @@ jobs:
             --allow-only="MIT License;MIT;BSD License;BSD-2-Clause;BSD-3-Clause;Apache Software License;Apache-2.0;Apache-2.0 OR BSD-2-Clause;Mozilla Public License 2.0 (MPL 2.0);PSF-2.0;Python Software Foundation License"
 
       - name: SonarCloud scan
-        if: matrix.python-version == '3.13' && env.SONAR_TOKEN != '' && github.event_name != 'pull_request'
+        if: matrix.python-version == '3.13' && env.SONAR_TOKEN != '' && github.ref == 'refs/heads/main'
         uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
