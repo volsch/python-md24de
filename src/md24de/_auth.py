@@ -11,7 +11,7 @@ import httpx
 
 from md24de._exceptions import LoginError
 
-_BASE_URL = "https://messdienst24.de"
+_BASE_URL = "https://legacy.messdienst24.de"
 
 _log = logging.getLogger(__name__)
 

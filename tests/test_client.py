@@ -195,7 +195,7 @@ class TestHttpErrorPaths:
             c = Md24deClient(tenant="xy", username="u", password="p")  # noqa: S106  # NOSONAR
         # Replace the real HTTP client with one backed by the test transport.
         c._http.close()  # pyright: ignore[reportPrivateUsage]
-        c._http = httpx.Client(transport=transport, base_url="https://messdienst24.de")  # pyright: ignore[reportPrivateUsage]
+        c._http = httpx.Client(transport=transport, base_url="https://legacy.messdienst24.de")  # pyright: ignore[reportPrivateUsage]
         return c
 
     # --- _fetch_consumption_html ------------------------------------------
@@ -281,7 +281,7 @@ class TestResponseSizeLimit:
         ):
             c = Md24deClient(tenant="xy", username="u", password="p")  # noqa: S106  # NOSONAR
         c._http.close()  # pyright: ignore[reportPrivateUsage]
-        c._http = httpx.Client(transport=transport, base_url="https://messdienst24.de")  # pyright: ignore[reportPrivateUsage]
+        c._http = httpx.Client(transport=transport, base_url="https://legacy.messdienst24.de")  # pyright: ignore[reportPrivateUsage]
         return c
 
     def test_pdf_over_limit_raises(self, sample_report: ConsumptionReport) -> None:
