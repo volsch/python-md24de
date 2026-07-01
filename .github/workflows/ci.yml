@@ -1,7 +1,7 @@
 # Update pinned action SHAs with:
 #   gh api repos/actions/checkout/git/ref/tags/v6 --jq '.object.sha'
 #   gh api repos/actions/setup-python/git/ref/tags/v6 --jq '.object.sha'
-#   gh api repos/SonarSource/sonarcloud-github-action/git/ref/tags/v5 --jq '.object.sha'
+#   gh api repos/SonarSource/sonarqube-scan-action/git/ref/tags/v8.1.0 --jq '.object.sha'
 name: CI
 
 on:
@@ -14,6 +14,9 @@ jobs:
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     strategy:
       matrix:
@@ -53,7 +56,7 @@ jobs:
             --allow-only="MIT License;MIT;BSD License;BSD-2-Clause;BSD-3-Clause;Apache Software License;Apache-2.0;Apache-2.0 OR BSD-2-Clause;Mozilla Public License 2.0 (MPL 2.0);PSF-2.0;Python Software Foundation License"
 
       - name: SonarCloud scan
-        if: ${{ matrix.python-version == '3.13' && env.SONAR_TOKEN != '' }}
-        uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5
+        if: matrix.python-version == '3.13' && env.SONAR_TOKEN != '' && github.ref == 'refs/heads/main'
+        uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}

@@ -15,7 +15,7 @@ from md24de._models import (
 )
 from md24de._parser import parse_available_month, parse_consumption_html
 
-_BASE_URL = "https://messdienst24.de"
+_BASE_URL = "https://legacy.messdienst24.de"
 
 # Hard cap on how many bytes any single response may contain.
 # Protects against a slow-drip server holding the connection open indefinitely

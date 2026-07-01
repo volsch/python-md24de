@@ -9,6 +9,9 @@
 Unofficial Python client library for the [messdienst24.de](https://messdienst24.de) utility-consumption portal.
 Provides typed, programmatic access to heating and hot-water consumption data and PDF document download.
 
+> **Note** — This library accesses the **legacy portal** at
+> [legacy.messdienst24.de](https://legacy.messdienst24.de).
+
 > **Disclaimer** — This project is not affiliated with, endorsed by, or in any way officially
 > connected with messdienst24.de or its operators. It was built by observing the portal's
 > web interface for personal and educational use. Use at your own risk.
@@ -74,7 +77,7 @@ with Md24deClient(tenant="xy", username="your_user", password="your_pass") as cl
 ```
 
 The `tenant` is the short identifier in your portal URL — e.g. `xy` if your portal login page
-is `https://messdienst24.de/?md=xy`.
+is `https://legacy.messdienst24.de/?md=xy`.
 
 > **Note — Data availability** — The portal always serves the previous month's data, never
 > the current month. For example, in June you will receive either April's or May's data,
