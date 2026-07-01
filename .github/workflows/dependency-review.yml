@@ -27,5 +27,8 @@ jobs:
             ISC,
             MPL-2.0,
             PSF-2.0,
-            Python-2.0
+            Python-2.0,
+            LGPL-3.0,
+            LGPL-3.0-only,
+            LGPL-3.0-or-later
           comment-summary-in-pr: always
