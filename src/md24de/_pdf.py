@@ -337,7 +337,7 @@ def _comparison_cell(
     if ref_value is not None:
         symbol = _compute_symbol(your_kwh, ref_value)
         return f"{your_str} {symbol} {_fmt_kwh(ref_value)}", _symbol_color(symbol)
-    return f"{your_str}  -", _TEXT_COLOR
+    return f"{your_str} -", _TEXT_COLOR
 
 
 def _symbol_color(symbol: str) -> colors.Color:

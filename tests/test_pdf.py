@@ -111,7 +111,7 @@ class TestRenderConsumptionReportPdf:
         # history entry exists -> symbol computed directly from the values
         assert "0,0 < 150,0" in text
         # vs_previous_year for heating: neither a comparison nor a history match
-        assert "0,0  -" in text
+        assert "0,0 -" in text
         # vs_previous_month/vs_previous_year for hot water: comparison known from the
         # portal, but no matching history entry -> symbol shown without a reference value
         assert "50,0 >" in text
@@ -131,7 +131,7 @@ class TestRenderConsumptionReportPdf:
         assert more_color != less_color
         # "equal" and "no reference value" use the default (black) text color.
         assert _span_color(pdf_bytes, "50,0 =") == black
-        assert _span_color(pdf_bytes, "0,0  -") == black
+        assert _span_color(pdf_bytes, "0,0 -") == black
         # the legend itself uses the same colors for its "<"/">" segments.
         assert _span_color(pdf_bytes, "< weniger") == less_color
         assert _span_color(pdf_bytes, "> mehr") == more_color
