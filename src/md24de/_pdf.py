@@ -16,13 +16,9 @@ from reportlab.platypus import Flowable, Paragraph, SimpleDocTemplate, Spacer, T
 
 from md24de._exceptions import Md24deError
 from md24de._models import Comparison, ConsumptionReport, MeterReading, MeterReport
-from md24de._parser import GERMAN_MONTHS
+from md24de._parser import GERMAN_MONTH_NAMES
 
 _log = logging.getLogger(__name__)
-
-# Reverse of _parser.GERMAN_MONTHS (name -> number) for rendering a month number
-# back to its German name in the header.
-_GERMAN_MONTH_NAMES: dict[int, str] = {number: name for name, number in GERMAN_MONTHS.items()}
 
 _MARGIN = 50.0
 
@@ -92,7 +88,7 @@ def render_consumption_report_pdf(report: ConsumptionReport) -> bytes:
         rightMargin=_MARGIN,
         topMargin=_MARGIN,
         bottomMargin=_MARGIN,
-        title=f"UVI {_GERMAN_MONTH_NAMES[month]} {year:04d}",
+        title=f"UVI {GERMAN_MONTH_NAMES[month]} {year:04d}",
     )
     story: list[Flowable] = [
         *_build_header(year, month),
@@ -122,7 +118,7 @@ def _current_period(report: ConsumptionReport) -> tuple[int, int]:
 
 
 def _build_header(year: int, month: int) -> list[Flowable]:
-    title = f"UVI {_GERMAN_MONTH_NAMES[month]} {year:04d}"
+    title = f"UVI {GERMAN_MONTH_NAMES[month]} {year:04d}"
     style = ParagraphStyle(
         name="Header",
         fontName=_FONT,
@@ -204,7 +200,7 @@ def _build_meter_chart(title: str, meter: MeterReport, year: int, month: int) ->
 
 
 def _period_label(year: int, month: int) -> str:
-    return f"{_GERMAN_MONTH_NAMES[month]} {year:04d}"
+    return f"{GERMAN_MONTH_NAMES[month]} {year:04d}"
 
 
 def _chart_period_labels(year: int, month: int) -> tuple[str, str, str]:

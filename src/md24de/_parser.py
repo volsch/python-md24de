@@ -36,6 +36,11 @@ GERMAN_MONTHS: dict[str, int] = {
     "Dezember": 12,
 }
 
+#: Mapping of month numbers (1–12) to their German month names, the reverse
+#: of :data:`GERMAN_MONTHS`. Exported publicly so callers can render German
+#: month names (e.g. in reports or emails) without duplicating the mapping.
+GERMAN_MONTH_NAMES: dict[int, str] = {number: name for name, number in GERMAN_MONTHS.items()}
+
 
 # Substrings that uniquely identify each dataset by its visible label text.
 # These are the strings shown in the chart legend — far more stable than colors.

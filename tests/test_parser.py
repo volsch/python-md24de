@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup, Tag
 from md24de._exceptions import ParseError
 from md24de._models import Comparison
 from md24de._parser import (  # pyright: ignore[reportPrivateUsage]
+    GERMAN_MONTH_NAMES,
     GERMAN_MONTHS,
     _canvas_is_heating,  # pyright: ignore[reportPrivateUsage]
     _classify_reference,  # pyright: ignore[reportPrivateUsage]
@@ -162,6 +163,18 @@ class TestGermanMonths:
 
     def test_all_values_unique(self) -> None:
         assert sorted(GERMAN_MONTHS.values()) == list(range(1, 13))
+
+    def test_month_names_is_reverse_of_german_months(self) -> None:
+        assert len(GERMAN_MONTH_NAMES) == 12
+        assert GERMAN_MONTH_NAMES[1] == "Januar"
+        assert GERMAN_MONTH_NAMES[12] == "Dezember"
+        assert GERMAN_MONTH_NAMES[3] == "März"
+        assert {name: number for number, name in GERMAN_MONTH_NAMES.items()} == GERMAN_MONTHS
+
+    def test_month_names_publicly_exported(self) -> None:
+        import md24de
+
+        assert md24de.GERMAN_MONTH_NAMES is GERMAN_MONTH_NAMES
 
 
 class TestHelpers:

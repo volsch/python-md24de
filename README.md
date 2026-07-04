@@ -206,6 +206,10 @@ comparable-household average, and the vs.-average/vs.-previous-month/vs.-previou
 comparisons), and the mandatory disclosure notice. It deliberately omits the address and
 object number present in the portal's own PDF (see `get_pdf()`).
 
+`GERMAN_MONTH_NAMES` is a public constant mapping month numbers (1-12) to their German
+names (e.g. `{5: "Mai"}`), for callers that need to render a German month name (e.g. in
+custom reports or emails) without duplicating the mapping.
+
 ### Exceptions
 
 | Exception | Raised when |

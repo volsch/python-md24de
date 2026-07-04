@@ -26,6 +26,10 @@ Session-independent helpers -- operate on an already-parsed
     json_text = dump_consumption_report(report)
     same_report = load_consumption_report(json_text)
     uvi_pdf_bytes = render_consumption_report_pdf(report)
+
+:data:`GERMAN_MONTH_NAMES` maps month numbers (1-12) to their German names
+(e.g. ``{5: "Mai"}``), for callers that need to render a German month name
+without depending on the library's internal parsing logic.
 """
 
 import logging
@@ -46,6 +50,7 @@ from md24de._models import (  # noqa: E402
     MeterReport,
     ObjectInfo,
 )
+from md24de._parser import GERMAN_MONTH_NAMES  # noqa: E402
 from md24de._pdf import render_consumption_report_pdf  # noqa: E402
 from md24de._serialization import (  # noqa: E402
     dump_consumption_report,
@@ -62,6 +67,8 @@ __all__ = [
     "MeterReading",
     "MeterReport",
     "ObjectInfo",
+    # Constants
+    "GERMAN_MONTH_NAMES",
     # Session-independent helpers
     "dump_consumption_report",
     "load_consumption_report",
