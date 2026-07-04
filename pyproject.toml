@@ -25,6 +25,7 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "lxml>=5.0",
     "json5>=0.9",
+    "reportlab>=4.0",
 ]
 
 [project.optional-dependencies]
@@ -36,6 +37,7 @@ dev = [
     "ruff>=0.9",
     "types-beautifulsoup4>=4.12",
     "pip-licenses>=5.0",
+    "pypdf>=5.0",
 ]
 
 [tool.hatch.build.targets.wheel]

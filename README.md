@@ -177,6 +177,35 @@ class Comparison(Enum):
     EQUAL = "equal"
 ```
 
+### Session-independent helpers
+
+These functions operate on an already-parsed `ConsumptionReport` and require no portal
+access — useful for archiving data or re-generating output from stored reports.
+
+| Function | Returns | Description |
+|---|---|---|
+| `dump_consumption_report(report)` | `str` | Compact JSON serialization; fields with `None` are omitted |
+| `load_consumption_report(data)` | `ConsumptionReport` | Parses JSON produced by `dump_consumption_report()` |
+| `render_consumption_report_pdf(report)` | `bytes` | Renders a simplified UVI PDF (no address/object number) |
+
+```python
+from md24de import (
+    dump_consumption_report,
+    load_consumption_report,
+    render_consumption_report_pdf,
+)
+
+json_text = dump_consumption_report(report)
+same_report = load_consumption_report(json_text)
+uvi_pdf_bytes = render_consumption_report_pdf(report)
+```
+
+`render_consumption_report_pdf()` produces a one-page PDF containing only the period
+(`UVI <Month> <Year>`), the values required by § 6a HeizkostenV (your consumption, the
+comparable-household average, and the vs.-average/vs.-previous-month/vs.-previous-year
+comparisons), and the mandatory disclosure notice. It deliberately omits the address and
+object number present in the portal's own PDF (see `get_pdf()`).
+
 ### Exceptions
 
 | Exception | Raised when |

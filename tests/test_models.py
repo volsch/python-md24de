@@ -48,14 +48,14 @@ class TestAvailableMonth:
 
 class TestMeterReading:
     def test_creation(self) -> None:
-        r = MeterReading(year=2026, month=5, your_kwh=82.0, average_kwh=94.0)
+        r = MeterReading(year=2026, month=5, your_kwh=55.0, average_kwh=65.0)
         assert r.month == 5
         assert r.year == 2026
-        assert r.your_kwh == pytest.approx(82.0)
-        assert r.average_kwh == pytest.approx(94.0)
+        assert r.your_kwh == pytest.approx(55.0)
+        assert r.average_kwh == pytest.approx(65.0)
 
     def test_frozen(self) -> None:
-        r = MeterReading(year=2026, month=5, your_kwh=82.0, average_kwh=94.0)
+        r = MeterReading(year=2026, month=5, your_kwh=55.0, average_kwh=65.0)
         with pytest.raises(AttributeError):
             r.your_kwh = 0.0  # type: ignore[misc]
 
@@ -63,17 +63,17 @@ class TestMeterReading:
 class TestMeterReport:
     def _make(self) -> MeterReport:
         return MeterReport(
-            current_kwh=82.0,
-            average_kwh=94.0,
+            current_kwh=55.0,
+            average_kwh=65.0,
             vs_average=Comparison.LESS,
             vs_previous_month=Comparison.LESS,
             vs_previous_year=Comparison.LESS,
-            history=(MeterReading(year=2026, month=5, your_kwh=82.0, average_kwh=94.0),),
+            history=(MeterReading(year=2026, month=5, your_kwh=55.0, average_kwh=65.0),),
         )
 
     def test_creation(self) -> None:
         r = self._make()
-        assert r.current_kwh == pytest.approx(82.0)
+        assert r.current_kwh == pytest.approx(55.0)
         assert r.vs_average is Comparison.LESS
         assert r.vs_previous_month is Comparison.LESS
         assert r.vs_previous_year is Comparison.LESS
@@ -81,7 +81,7 @@ class TestMeterReport:
     def test_optional_fields_none(self) -> None:
         r = MeterReport(
             current_kwh=0.0,
-            average_kwh=134.0,
+            average_kwh=210.0,
             vs_average=Comparison.LESS,
             vs_previous_month=None,
             vs_previous_year=None,
@@ -118,15 +118,15 @@ class TestConsumptionReport:
             object_info=ObjectInfo(object_number="x", address="y"),
             heating=MeterReport(
                 current_kwh=0.0,
-                average_kwh=134.0,
+                average_kwh=210.0,
                 vs_average=Comparison.LESS,
                 vs_previous_month=None,
                 vs_previous_year=Comparison.LESS,
                 history=(),
             ),
             hot_water=MeterReport(
-                current_kwh=82.0,
-                average_kwh=94.0,
+                current_kwh=55.0,
+                average_kwh=65.0,
                 vs_average=Comparison.LESS,
                 vs_previous_month=Comparison.LESS,
                 vs_previous_year=Comparison.LESS,

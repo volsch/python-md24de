@@ -54,18 +54,19 @@ class TestParseConsumptionHtml:
 
     def test_heating_current_kwh(self, consumption_html: str) -> None:
         report = parse_consumption_html(consumption_html)
-        assert report.heating.current_kwh == pytest.approx(0.0)
+        assert report.heating.current_kwh == pytest.approx(15.0)
 
     def test_heating_average_kwh(self, consumption_html: str) -> None:
         report = parse_consumption_html(consumption_html)
-        assert report.heating.average_kwh == pytest.approx(134.0)
+        assert report.heating.average_kwh == pytest.approx(210.0)
 
     def test_heating_vs_average(self, consumption_html: str) -> None:
         report = parse_consumption_html(consumption_html)
         assert report.heating.vs_average is Comparison.LESS
 
     def test_heating_vs_previous_month_is_none(self, consumption_html: str) -> None:
-        # May 2026 had 0 kWh heating — portal omits previous-month comparison.
+        # The fixture has no "als im April 2026" sentence for heating —
+        # the portal omits the previous-month comparison in this case.
         report = parse_consumption_html(consumption_html)
         assert report.heating.vs_previous_month is None
 
@@ -81,11 +82,11 @@ class TestParseConsumptionHtml:
         report = parse_consumption_html(consumption_html)
         h = report.heating.history
         assert h[0].month == 5 and h[0].year == 2026
-        assert h[0].your_kwh == pytest.approx(0.0) and h[0].average_kwh == pytest.approx(134.0)
+        assert h[0].your_kwh == pytest.approx(15.0) and h[0].average_kwh == pytest.approx(210.0)
         assert h[1].month == 4 and h[1].year == 2026
-        assert h[1].your_kwh == pytest.approx(132.0) and h[1].average_kwh == pytest.approx(269.0)
+        assert h[1].your_kwh == pytest.approx(145.0) and h[1].average_kwh == pytest.approx(305.0)
         assert h[2].month == 5 and h[2].year == 2025
-        assert h[2].your_kwh == pytest.approx(128.0) and h[2].average_kwh == pytest.approx(134.0)
+        assert h[2].your_kwh == pytest.approx(140.0) and h[2].average_kwh == pytest.approx(210.0)
 
     # ------------------------------------------------------------------
     # Hot water
@@ -93,11 +94,11 @@ class TestParseConsumptionHtml:
 
     def test_hot_water_current_kwh(self, consumption_html: str) -> None:
         report = parse_consumption_html(consumption_html)
-        assert report.hot_water.current_kwh == pytest.approx(82.0)
+        assert report.hot_water.current_kwh == pytest.approx(55.0)
 
     def test_hot_water_average_kwh(self, consumption_html: str) -> None:
         report = parse_consumption_html(consumption_html)
-        assert report.hot_water.average_kwh == pytest.approx(94.0)
+        assert report.hot_water.average_kwh == pytest.approx(65.0)
 
     def test_hot_water_vs_average(self, consumption_html: str) -> None:
         report = parse_consumption_html(consumption_html)
@@ -119,11 +120,11 @@ class TestParseConsumptionHtml:
         report = parse_consumption_html(consumption_html)
         h = report.hot_water.history
         assert h[0].month == 5 and h[0].year == 2026
-        assert h[0].your_kwh == pytest.approx(82.0) and h[0].average_kwh == pytest.approx(94.0)
+        assert h[0].your_kwh == pytest.approx(55.0) and h[0].average_kwh == pytest.approx(65.0)
         assert h[1].month == 4 and h[1].year == 2026
-        assert h[1].your_kwh == pytest.approx(103.0) and h[1].average_kwh == pytest.approx(91.0)
+        assert h[1].your_kwh == pytest.approx(60.0) and h[1].average_kwh == pytest.approx(62.0)
         assert h[2].month == 5 and h[2].year == 2025
-        assert h[2].your_kwh == pytest.approx(115.0) and h[2].average_kwh == pytest.approx(94.0)
+        assert h[2].your_kwh == pytest.approx(58.0) and h[2].average_kwh == pytest.approx(65.0)
 
     # ------------------------------------------------------------------
     # History is newest-first
@@ -189,8 +190,8 @@ def _chart_script(
     *,
     canvas_id: str = "test_hz",
     labels: str = "['Mai 2026']",
-    your_data: str = "[82.0]",
-    avg_data: str = "[94.0]",
+    your_data: str = "[55.0]",
+    avg_data: str = "[65.0]",
     your_label: str = "Ihr Verbrauch kWh",
     avg_label: str = "Verbrauch vergleichbare Haushalte",
 ) -> str:

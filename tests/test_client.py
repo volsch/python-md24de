@@ -29,27 +29,27 @@ def sample_report() -> ConsumptionReport:
             address="Musterstraße 1, 12345 Musterstadt",
         ),
         heating=MeterReport(
-            current_kwh=0.0,
-            average_kwh=134.0,
+            current_kwh=15.0,
+            average_kwh=210.0,
             vs_average=Comparison.LESS,
             vs_previous_month=None,
             vs_previous_year=Comparison.LESS,
             history=(
-                MeterReading(year=2026, month=5, your_kwh=0.0, average_kwh=134.0),
-                MeterReading(year=2026, month=4, your_kwh=132.0, average_kwh=269.0),
-                MeterReading(year=2025, month=5, your_kwh=128.0, average_kwh=134.0),
+                MeterReading(year=2026, month=5, your_kwh=15.0, average_kwh=210.0),
+                MeterReading(year=2026, month=4, your_kwh=145.0, average_kwh=305.0),
+                MeterReading(year=2025, month=5, your_kwh=140.0, average_kwh=210.0),
             ),
         ),
         hot_water=MeterReport(
-            current_kwh=82.0,
-            average_kwh=94.0,
+            current_kwh=55.0,
+            average_kwh=65.0,
             vs_average=Comparison.LESS,
             vs_previous_month=Comparison.LESS,
             vs_previous_year=Comparison.LESS,
             history=(
-                MeterReading(year=2026, month=5, your_kwh=82.0, average_kwh=94.0),
-                MeterReading(year=2026, month=4, your_kwh=103.0, average_kwh=91.0),
-                MeterReading(year=2025, month=5, your_kwh=115.0, average_kwh=94.0),
+                MeterReading(year=2026, month=5, your_kwh=55.0, average_kwh=65.0),
+                MeterReading(year=2026, month=4, your_kwh=60.0, average_kwh=62.0),
+                MeterReading(year=2025, month=5, your_kwh=58.0, average_kwh=65.0),
             ),
         ),
     )
@@ -93,15 +93,15 @@ class TestGetConsumptionReport:
 
     def test_report_heating(self, client: Md24deClient) -> None:
         report = client.get_consumption_report()
-        assert report.heating.current_kwh == pytest.approx(0.0)
-        assert report.heating.average_kwh == pytest.approx(134.0)
+        assert report.heating.current_kwh == pytest.approx(15.0)
+        assert report.heating.average_kwh == pytest.approx(210.0)
         assert report.heating.vs_average is Comparison.LESS
         assert report.heating.vs_previous_month is None
         assert report.heating.vs_previous_year is Comparison.LESS
 
     def test_report_hot_water(self, client: Md24deClient) -> None:
         report = client.get_consumption_report()
-        assert report.hot_water.current_kwh == pytest.approx(82.0)
+        assert report.hot_water.current_kwh == pytest.approx(55.0)
         assert report.hot_water.vs_previous_month is Comparison.LESS
 
 
