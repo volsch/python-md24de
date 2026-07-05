@@ -17,6 +17,10 @@ from md24de import (
     ObjectInfo,
     render_consumption_report_pdf,
 )
+from md24de._pdf import (  # pyright: ignore[reportPrivateUsage]
+    _chart_bar_formatter,  # pyright: ignore[reportPrivateUsage]
+    _fmt_kwh,  # pyright: ignore[reportPrivateUsage]
+)
 
 _RG_RE = re.compile(r"([0-9.]+) ([0-9.]+) ([0-9.]+) rg")
 
@@ -97,41 +101,42 @@ class TestRenderConsumptionReportPdf:
         text = _pdf_text(render_consumption_report_pdf(report))
         assert "Heizung" in text
         assert "Warmwasser" in text
-        assert "0,0" in text
-        assert "200,0" in text
-        assert "50,0" in text
-        assert "60,0" in text
+        # all fixture values are whole numbers -> no decimal digits in the table
+        assert "200" in text
+        assert "60" in text
+        assert "200,0" not in text
+        assert "60,0" not in text
 
     def test_contains_comparison_symbols(self, report: ConsumptionReport) -> None:
         text = _pdf_text(render_consumption_report_pdf(report))
         # vs_average: both values always known -> "your symbol ref"
-        assert "0,0 < 200,0" in text
-        assert "50,0 < 60,0" in text
+        assert "0 < 200" in text
+        assert "50 < 60" in text
         # vs_previous_month for heating: no comparison from portal, but a matching
         # history entry exists -> symbol computed directly from the values
-        assert "0,0 < 150,0" in text
+        assert "0 < 150" in text
         # vs_previous_year for heating: neither a comparison nor a history match
-        assert "0,0 -" in text
+        assert "0 -" in text
         # vs_previous_month/vs_previous_year for hot water: comparison known from the
         # portal, but no matching history entry -> symbol shown without a reference value
-        assert "50,0 >" in text
-        assert "50,0 =" in text
+        assert "50 >" in text
+        assert "50 =" in text
 
     def test_comparison_cell_colors(self, report: ConsumptionReport) -> None:
         pdf_bytes = render_consumption_report_pdf(report)
         black = (0.0, 0.0, 0.0)
         # "less" (own value below reference) is rendered in green, regardless of
         # whether the symbol came from the portal or was computed from history.
-        less_color = _span_color(pdf_bytes, "0,0 < 200,0")
-        assert less_color == _span_color(pdf_bytes, "0,0 < 150,0")
+        less_color = _span_color(pdf_bytes, "0 < 200")
+        assert less_color == _span_color(pdf_bytes, "0 < 150")
         assert less_color != black
         # "more" (own value above reference) is rendered in red.
-        more_color = _span_color(pdf_bytes, "50,0 >")
+        more_color = _span_color(pdf_bytes, "50 >")
         assert more_color != black
         assert more_color != less_color
         # "equal" and "no reference value" use the default (black) text color.
-        assert _span_color(pdf_bytes, "50,0 =") == black
-        assert _span_color(pdf_bytes, "0,0 -") == black
+        assert _span_color(pdf_bytes, "50 =") == black
+        assert _span_color(pdf_bytes, "0 -") == black
         # the legend itself uses the same colors for its "<"/">" segments.
         assert _span_color(pdf_bytes, "< weniger") == less_color
         assert _span_color(pdf_bytes, "> mehr") == more_color
@@ -148,13 +153,16 @@ class TestRenderConsumptionReportPdf:
         # the previous month's reference (average) value for heating is only
         # ever shown in the chart, not in any table -> proves the chart data
         # (not just its axis labels) made it into the rendered page.
-        assert "300,0" in text
+        # all fixture values are whole numbers -> no decimal digits in the chart either.
+        assert "300" in text
+        assert "300,0" not in text
 
     def test_contains_note(self, report: ConsumptionReport) -> None:
         text = _pdf_text(render_consumption_report_pdf(report))
         assert "Hinweis" in text
         assert "Heizkostenverordnung" in text
         assert "UVI" in text
+        assert "§ 6a Absatz 2" in text
 
     def test_no_history_raises_md24de_error(self) -> None:
         empty_meter = MeterReport(
@@ -172,3 +180,73 @@ class TestRenderConsumptionReportPdf:
         )
         with pytest.raises(Md24deError):
             render_consumption_report_pdf(report)
+
+    def test_none_kwh_value_renders_as_dash(self, report: ConsumptionReport) -> None:
+        """A None current_kwh (not supplied by the portal) is shown as '-', not '0,0'."""
+        report_with_missing_value = ConsumptionReport(
+            object_info=report.object_info,
+            heating=MeterReport(
+                current_kwh=None,
+                average_kwh=report.heating.average_kwh,
+                vs_average=None,
+                vs_previous_month=None,
+                vs_previous_year=None,
+                history=(MeterReading(year=2026, month=5, your_kwh=None, average_kwh=200.0),),
+            ),
+            hot_water=report.hot_water,
+        )
+        pdf_bytes = render_consumption_report_pdf(report_with_missing_value)
+        assert pdf_bytes.startswith(b"%PDF")
+        text = _pdf_text(pdf_bytes)
+        assert "- <" in text or "-" in text
+
+    def test_mixed_decimals_in_table_shown_per_value(self, report: ConsumptionReport) -> None:
+        """The table formats each value independently: whole numbers drop the decimal
+        even when a fractional value elsewhere forces the *chart* to show decimals
+        uniformly for all its own bars (the two use independent formatting rules).
+        """
+        mixed_report = ConsumptionReport(
+            object_info=report.object_info,
+            heating=MeterReport(
+                current_kwh=15.5,
+                average_kwh=200.0,
+                vs_average=Comparison.LESS,
+                vs_previous_month=None,
+                vs_previous_year=None,
+                history=(MeterReading(year=2026, month=5, your_kwh=15.5, average_kwh=200.0),),
+            ),
+            hot_water=report.hot_water,
+        )
+        pdf_bytes = render_consumption_report_pdf(mixed_report)
+        stream = _content_stream(pdf_bytes)
+        # table: current_kwh (15,5) keeps its decimal, average_kwh (200) drops it
+        assert "(15,5)" in stream
+        assert "(200)" in stream
+        # chart: the same average_kwh (200.0) is shown with a decimal there, because
+        # the fractional current_kwh (15,5) forces uniform decimals across that chart
+        assert "(200,0)" in stream
+
+
+class TestFmtKwh:
+    def test_none_renders_as_dash(self) -> None:
+        assert _fmt_kwh(None) == "-"
+
+    def test_whole_number_has_no_decimal(self) -> None:
+        assert _fmt_kwh(200.0) == "200"
+        assert _fmt_kwh(0.0) == "0"
+
+    def test_fractional_number_keeps_one_decimal(self) -> None:
+        assert _fmt_kwh(15.5) == "15,5"
+
+
+class TestChartBarFormatter:
+    def test_no_decimals_when_all_values_are_whole(self) -> None:
+        formatter = _chart_bar_formatter([0.0, 150.0, None], [200.0, 300.0, None])
+        assert formatter(150.0) == "150"
+        assert formatter(0.0) == "0"
+
+    def test_decimals_shown_for_all_values_when_any_has_a_fraction(self) -> None:
+        """If any plotted value has decimals, every bar in that chart shows one digit."""
+        formatter = _chart_bar_formatter([15.5, 150.0, None], [200.0, 300.0, None])
+        assert formatter(150.0) == "150,0"
+        assert formatter(15.5) == "15,5"

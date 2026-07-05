@@ -45,18 +45,22 @@ _COMPARISON_SYMBOLS: dict[Comparison, str] = {
     Comparison.EQUAL: "=",
 }
 
-# Condensed version of the mandatory § 6a HeizkostenV disclosure text.
+# Condensed version of the mandatory § 6a Abs. 2 HeizkostenV disclosure text.
 _NOTE_TITLE = "Hinweis:"
 _NOTE_TEXT = (
     'Die Heizungs- und Warmwasserverbräuche wurden mit den zum Ablesezeitpunkt empfangenen '
-    "Werten berechnet und gemäß § 6a Heizkostenverordnung in kWh angegeben. Die unterjährige "
-    'Verbrauchsinformation ("UVI") ersetzt keine Abrechnung und ist für die monatliche '
+    "Werten berechnet und gemäß § 6a Absatz 2 Heizkostenverordnung in kWh angegeben. Diese "
+    'unterjährige Verbrauchsinformation ("UVI") deckt ausschließlich die monatlichen '
+    "Pflichtangaben nach § 6a Absatz 2 HeizkostenV ab (Verbrauch des Vormonats, Vergleich mit "
+    "dem Vormonat und dem entsprechenden Monat des Vorjahres sowie Vergleich mit einem "
+    "durchschnittlichen Nutzer). Sie ersetzt keine Abrechnung und ist für die monatliche "
     "Abrechnung nicht geeignet; auf ihrer Grundlage können Heizkostenvorschüsse weder angehoben "
     "noch gekürzt werden. Die Jahresendabrechnung kann aufgrund von Umlageschlüsseln und "
     "Korrekturwerten von den hier dargestellten Werten abweichen; ihre formelle und materielle "
     "Wirksamkeit bleibt von eventuellen Fehlern in der UVI unberührt. Die Aufsummierung der UVI "
     "über das Jahr ergibt weder den Jahresverbrauch noch einen Hinweis auf die Kostenentwicklung."
 )
+
 
 
 def render_consumption_report_pdf(report: ConsumptionReport) -> bytes:
@@ -175,7 +179,7 @@ def _build_meter_chart(title: str, meter: MeterReport, year: int, month: int) ->
     chart.valueAxis.valueMin = 0
     chart.bars[0].fillColor = _TEXT_COLOR
     chart.bars[1].fillColor = _LINE_COLOR
-    chart.barLabelFormat = _fmt_kwh
+    chart.barLabelFormat = _chart_bar_formatter(your_values, ref_values)
     chart.barLabels.fontName = _FONT
     chart.barLabels.fontSize = _CHART_FONT_SIZE
     chart.barLabels.nudge = 6
@@ -197,6 +201,33 @@ def _build_meter_chart(title: str, meter: MeterReport, year: int, month: int) ->
         Spacer(1, 4.0),
         Paragraph(legend_text, legend_style),
     ]
+
+
+def _chart_has_decimals(*value_lists: list[float | None]) -> bool:
+    """Return True if any value across *value_lists* has a nonzero fractional part."""
+    return any(
+        value is not None and not float(value).is_integer()
+        for values in value_lists
+        for value in values
+    )
+
+
+def _chart_bar_formatter(*value_lists: list[float | None]) -> Callable[[float], str]:
+    """Build a bar-label formatter shared by all bars in one chart.
+
+    Unlike the per-value table formatting in :func:`_fmt_kwh`, all bars in a
+    single chart use the *same* number of fractional digits: if any value
+    plotted in this chart has decimals, every bar label shows one fractional
+    digit (so the bars stay visually comparable); otherwise none do.
+    """
+    show_decimals = _chart_has_decimals(*value_lists)
+
+    def formatter(value: float) -> str:
+        if show_decimals:
+            return f"{value:.1f}".replace(".", ",")
+        return str(round(value))
+
+    return formatter
 
 
 def _period_label(year: int, month: int) -> str:
@@ -313,7 +344,7 @@ def _comparison_cells(
 
 
 def _comparison_cell(
-    your_kwh: float,
+    your_kwh: float | None,
     ref_value: float | None,
     comparison: Comparison | None,
 ) -> _ComparisonCell:
@@ -322,9 +353,10 @@ def _comparison_cell(
     If the reference value could not be determined but the portal did supply
     a comparison direction, that direction is still shown (without the
     reference number). Falls back to a symbol computed directly from the two
-    values when the portal did not supply a comparison, but the reference
-    value is known. Shows only your value followed by ``-`` when neither is
-    available. Returns the cell text together with the color it should be
+    values when the portal did not supply a comparison, but both values are
+    known. Shows ``-`` in place of any value the portal did not supply, and
+    omits the symbol entirely when your own value is missing (no symbol can
+    be derived). Returns the cell text together with the color it should be
     drawn in (green if your value is lower, red if higher, default otherwise).
     """
     your_str = _fmt_kwh(your_kwh)
@@ -334,9 +366,11 @@ def _comparison_cell(
         if ref_value is None:
             return f"{your_str} {symbol}", color
         return f"{your_str} {symbol} {_fmt_kwh(ref_value)}", color
-    if ref_value is not None:
+    if ref_value is not None and your_kwh is not None:
         symbol = _compute_symbol(your_kwh, ref_value)
         return f"{your_str} {symbol} {_fmt_kwh(ref_value)}", _symbol_color(symbol)
+    if ref_value is not None:
+        return f"{your_str} - {_fmt_kwh(ref_value)}", _TEXT_COLOR
     return f"{your_str} -", _TEXT_COLOR
 
 
@@ -397,8 +431,16 @@ def _is_same_month_previous_year(
     return predicate
 
 
-def _fmt_kwh(value: float) -> str:
-    """Format *value* with one fractional digit using a German decimal comma."""
+def _fmt_kwh(value: float | None) -> str:
+    """Format *value* for the tables, per-value: one fractional digit if *value*
+    has a fractional part, none if it's a whole number, using a German decimal comma.
+
+    Returns ``"-"`` if *value* is ``None`` (the portal did not supply a value).
+    """
+    if value is None:
+        return "-"
+    if float(value).is_integer():
+        return str(int(value))
     return f"{value:.1f}".replace(".", ",")
 
 

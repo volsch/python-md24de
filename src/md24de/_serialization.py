@@ -95,12 +95,21 @@ def _to_json_value(value: object) -> JSONValue:
 
 def _meter_report_from_dict(obj: dict[str, Any]) -> MeterReport:
     return MeterReport(
-        current_kwh=obj["current_kwh"],
-        average_kwh=obj["average_kwh"],
+        current_kwh=obj.get("current_kwh"),
+        average_kwh=obj.get("average_kwh"),
         vs_average=_comparison_from_value(obj.get("vs_average")),
         vs_previous_month=_comparison_from_value(obj.get("vs_previous_month")),
         vs_previous_year=_comparison_from_value(obj.get("vs_previous_year")),
-        history=tuple(MeterReading(**h) for h in obj["history"]),
+        history=tuple(_meter_reading_from_dict(cast(dict[str, Any], h)) for h in obj["history"]),
+    )
+
+
+def _meter_reading_from_dict(obj: dict[str, Any]) -> MeterReading:
+    return MeterReading(
+        year=obj["year"],
+        month=obj["month"],
+        your_kwh=obj.get("your_kwh"),
+        average_kwh=obj.get("average_kwh"),
     )
 
 

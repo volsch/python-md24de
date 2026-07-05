@@ -308,6 +308,25 @@ class TestParseChartScript:
         with pytest.raises(ParseError, match="No readings found"):
             _parse_chart_script(script, "test_hz")
 
+    def test_null_data_value_becomes_none(self) -> None:
+        """A JSON ``null`` data point means "not supplied", distinct from 0.0."""
+        script = _chart_script(your_data="[null]", avg_data="[0.0]")
+        chart = _parse_chart_script(script, "test_hz")
+        assert chart.readings[0].your_kwh is None
+        assert chart.readings[0].average_kwh == pytest.approx(0.0)
+
+    def test_missing_trailing_data_point_becomes_none(self) -> None:
+        """Fewer data points than labels means the missing months become None, not 0.0."""
+        script = _chart_script(
+            labels="['Mai 2026', 'April 2026']",
+            your_data="[55.0]",
+            avg_data="[65.0]",
+        )
+        chart = _parse_chart_script(script, "test_hz")
+        assert len(chart.readings) == 2
+        assert chart.readings[1].your_kwh is None
+        assert chart.readings[1].average_kwh is None
+
     def test_valid_script_returns_chart_data(self) -> None:
         chart = _parse_chart_script(_chart_script(), "test_hz")
         assert chart.month == 5

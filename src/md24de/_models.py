@@ -35,22 +35,27 @@ class MeterReading:
     month: int
     """Month number (1–12)."""
 
-    your_kwh: float
-    """Your own consumption in kWh äq."""
+    your_kwh: float | None
+    """Your own consumption in kWh äq. ``None`` if the portal did not supply a value
+    for this month (distinct from an actual reading of 0 kWh)."""
 
-    average_kwh: float
-    """Average consumption of comparable households in kWh äq."""
+    average_kwh: float | None
+    """Average consumption of comparable households in kWh äq. ``None`` if the
+    portal did not supply a value for this month (distinct from an actual value
+    of 0 kWh)."""
 
 
 @dataclass(frozen=True)
 class MeterReport:
     """Full consumption report for one meter type (heating or hot water)."""
 
-    current_kwh: float
-    """Your consumption for the current month in kWh äq."""
+    current_kwh: float | None
+    """Your consumption for the current month in kWh äq. ``None`` if the portal
+    did not supply a value (distinct from an actual reading of 0 kWh)."""
 
-    average_kwh: float
-    """Average consumption of comparable households for the current month in kWh äq."""
+    average_kwh: float | None
+    """Average consumption of comparable households for the current month in kWh äq.
+    ``None`` if the portal did not supply a value (distinct from an actual value of 0 kWh)."""
 
     vs_average: Comparison | None
     """How your consumption compares to comparable households this month.

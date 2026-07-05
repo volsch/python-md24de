@@ -43,7 +43,23 @@ GERMAN_MONTH_NAMES: dict[int, str] = {number: name for name, number in GERMAN_MO
 
 
 # Substrings that uniquely identify each dataset by its visible label text.
-# These are the strings shown in the chart legend — far more stable than colors.
+# These are the strings shown in the chart legend — far more stable than colors
+# or dataset order/position.
+#
+# --- Dataset-selection fail-fast contract -----------------------------------
+# Datasets are matched by searching their Chart.js ``label`` field for these
+# markers (see _parse_chart_script). This is deliberately NOT positional and
+# has NO fallback: if the portal ever rewords its German legend text (e.g.
+# renames "Ihr Verbrauch" or "vergleichbare Haushalte"), the substring match
+# fails, `your_ds`/`avg_ds` resolve to None, and _parse_chart_script raises
+# ParseError immediately for that chart. We intentionally do not fall back to
+# positional/index-based dataset selection in that case — a silent guess
+# could swap "your consumption" and "average household" values without any
+# indication, which is worse than a hard, debuggable failure. If the portal's
+# wording changes, this is the single place to update the markers; the
+# resulting ParseError message names the missing marker text so the failure
+# is easy to diagnose (raise the log level to _TRACE to see the raw chart
+# config that failed to match).
 _YOUR_CONSUMPTION_MARKER = "Ihr Verbrauch"
 _AVERAGE_MARKER = "vergleichbare Haushalte"
 
@@ -174,6 +190,26 @@ def _parse_chart_script(script: str, canvas_id: str) -> _ChartData:
     Extracts the config object with balanced-brace matching (handles any level of
     nesting), then parses it with :func:`json5.loads` to get a proper Python dict.
     Datasets are identified by their ``label`` text — semantic, not positional.
+
+    Correctness guarantees and their fail-fast behavior:
+
+    * **Dataset identity** ("Ihr Verbrauch" vs. "vergleichbare Haushalte") is
+      resolved purely from each dataset's ``label`` text (see
+      ``_YOUR_CONSUMPTION_MARKER``/``_AVERAGE_MARKER`` above). There is no
+      positional or color-based fallback. If the portal changes its legend
+      wording so that neither dataset matches, :func:`_parse_chart_script`
+      raises :class:`ParseError` right here — it never guesses.
+    * **Month alignment** (e.g. that a "Mai 2026" reading really holds May's
+      numbers) relies on the Chart.js contract that ``data.labels`` and every
+      dataset's ``data`` array share the same index space — ``labels[i]``
+      always corresponds to ``datasets[*].data[i]``, exactly as the browser's
+      own Chart.js renderer requires to draw grouped bars correctly. The
+      readings loop below reuses that same index ``i`` to read both
+      ``your_values[i]`` and ``avg_values[i]``, so it can never attribute a
+      value to the wrong month — it either reads the correct paired value or,
+      if a dataset's ``data`` array is shorter than ``labels`` (a malformed/
+      inconsistent chart), leaves that reading's value as ``None`` rather
+      than shifting indices or misattributing another month's number.
     """
     config_block = _extract_chart_config(script, canvas_id)
     _log.log(_TRACE, "Chart config block for '%s':\n%s", canvas_id, _truncated(config_block))
@@ -212,12 +248,10 @@ def _parse_chart_script(script: str, canvas_id: str) -> _ChartData:
         )
 
     try:
-        your_values = [float(v) for v in your_ds["data"]]
-        avg_values = [float(v) for v in avg_ds["data"]]
+        your_values: list[float | None] = [_to_optional_float(v) for v in your_ds["data"]]
+        avg_values: list[float | None] = [_to_optional_float(v) for v in avg_ds["data"]]
     except (ValueError, TypeError, KeyError) as exc:
-        raise ParseError(
-            f"Non-numeric or missing data value in chart for '{canvas_id}': {exc}"
-        ) from exc
+        raise ParseError(f"Non-numeric data value in chart for '{canvas_id}': {exc}") from exc
 
     readings: list[MeterReading] = []
     for i, raw_label in enumerate(labels):
@@ -225,12 +259,17 @@ def _parse_chart_script(script: str, canvas_id: str) -> _ChartData:
         if not label:
             continue
         month_num, year = _parse_german_month_year(label, canvas_id)
+        # Reuse the same index `i` for both value arrays: Chart.js requires labels
+        # and every dataset's data array to share one index space, so labels[i]
+        # always pairs with your_values[i]/avg_values[i]. Never re-sort or
+        # re-index here — a shorter data array yields None (see docstring above),
+        # it must not shift and attribute a value to the wrong month.
         readings.append(
             MeterReading(
                 month=month_num,
                 year=year,
-                your_kwh=your_values[i] if i < len(your_values) else 0.0,
-                average_kwh=avg_values[i] if i < len(avg_values) else 0.0,
+                your_kwh=your_values[i] if i < len(your_values) else None,
+                average_kwh=avg_values[i] if i < len(avg_values) else None,
             )
         )
 
@@ -242,6 +281,15 @@ def _parse_chart_script(script: str, canvas_id: str) -> _ChartData:
         year=readings[0].year,
         readings=readings,
     )
+
+
+def _to_optional_float(value: float | int | str | None) -> float | None:
+    """Convert a raw Chart.js data value to ``float``, or ``None`` for a JSON ``null``.
+
+    ``None`` signals the portal genuinely did not supply a value for that month —
+    distinct from an actual reading of ``0.0``.
+    """
+    return None if value is None else float(value)
 
 
 def _extract_chart_config(script: str, canvas_id: str) -> str:
