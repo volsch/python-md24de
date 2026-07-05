@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from types import TracebackType
 
 import httpx
 
 from md24de._auth import login, logout
 from md24de._exceptions import Md24deError, ParseError
+from md24de._http_trace import HttpTraceCallback, build_request_trace, build_response_trace
 from md24de._models import (
     AvailableMonth,
     ConsumptionReport,
@@ -30,7 +32,7 @@ _DEFAULT_HEADERS: dict[str, str] = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
+        "Chrome/149.0.0.0 Safari/537.36"
     ),
     "Accept-Language": "de-DE,de;q=0.9",
     "Cache-Control": "no-cache, no-store",
@@ -62,6 +64,12 @@ class Md24deClient:
         username: Portal username.
         password: Portal password.
         timeout: HTTP request timeout in seconds (default 30).
+        http_trace_callback: Optional callback invoked for every non-authentication
+            HTTP request/response pair (see :data:`~md24de.HttpTraceCallback`).
+            Called exactly once per request, even if it fails. Never called for the
+            login/logout requests, so credentials are never exposed through it. Use
+            :class:`~md24de.FileHttpTraceLogger` for a ready-to-use implementation
+            that appends a timestamped trace to a file.
 
     Raises:
         LoginError: If authentication fails.
@@ -75,8 +83,10 @@ class Md24deClient:
         username: str,
         password: str,
         timeout: float = 30.0,
+        http_trace_callback: HttpTraceCallback | None = None,
     ) -> None:
         self._tenant = tenant
+        self._http_trace_callback = http_trace_callback
         self._http = httpx.Client(
             headers=_DEFAULT_HEADERS,
             timeout=timeout,
@@ -174,14 +184,13 @@ class Md24deClient:
         )
         referer = f"{_BASE_URL}/?md={self._tenant}"
         try:
-            with self._http.stream(
+            content = self._traced_stream_request(
                 "GET",
                 f"{_BASE_URL}/",
                 params={"format": "pdf"},
                 headers={"Referer": referer},
-            ) as resp:
-                resp.raise_for_status()
-                content = self._read_limited(resp, "PDF")
+                label="PDF",
+            )
         except httpx.HTTPStatusError as exc:
             raise Md24deError(f"PDF download failed with HTTP {exc.response.status_code}") from exc
         except httpx.HTTPError as exc:
@@ -202,14 +211,13 @@ class Md24deClient:
         _log.debug("Fetching consumption HTML")
         referer = f"{_BASE_URL}/?md={self._tenant}"
         try:
-            with self._http.stream(
+            raw = self._traced_stream_request(
                 "POST",
                 f"{_BASE_URL}/",
                 data={"action": "objverbmiet", "node": "content"},
                 headers={"Referer": referer},
-            ) as resp:
-                resp.raise_for_status()
-                raw = self._read_limited(resp, "Consumption page")
+                label="Consumption page",
+            )
         except httpx.HTTPStatusError as exc:
             raise Md24deError(
                 f"Consumption page request failed with HTTP {exc.response.status_code}"
@@ -218,6 +226,42 @@ class Md24deClient:
             raise Md24deError(f"Consumption page request failed: {exc}") from exc
         _log.debug("Consumption HTML fetched (%d bytes)", len(raw))
         return raw.decode(errors="replace")
+
+    def _traced_stream_request(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: Mapping[str, str] | None = None,
+        data: Mapping[str, str] | None = None,
+        headers: Mapping[str, str] | None = None,
+        label: str,
+    ) -> bytes:
+        """Send a streamed, size-limited HTTP request and return its raw body.
+
+        If an ``http_trace_callback`` was configured, it is invoked exactly once
+        with a snapshot of the request and (if any) response — regardless of
+        whether the request succeeded or failed. Must never be used for the
+        login/logout requests.
+        """
+        request = self._http.build_request(method, url, params=params, data=data, headers=headers)
+        req_trace = (
+            build_request_trace(request) if self._http_trace_callback is not None else None
+        )
+        resp: httpx.Response | None = None
+        body: bytes | None = None
+        try:
+            resp = self._http.send(request, stream=True)
+            try:
+                resp.raise_for_status()
+                body = self._read_limited(resp, label)
+            finally:
+                resp.close()
+            return body
+        finally:
+            if req_trace is not None and self._http_trace_callback is not None:
+                resp_trace = build_response_trace(resp, body) if resp is not None else None
+                self._http_trace_callback(req_trace, resp_trace)
 
     @staticmethod
     def _read_limited(resp: httpx.Response, label: str) -> bytes:

@@ -12,6 +12,9 @@ from md24de import (
     AvailableMonth,
     Comparison,
     ConsumptionReport,
+    HttpRequestTrace,
+    HttpResponseTrace,
+    HttpTraceCallback,
     Md24deClient,
     Md24deError,
     MeterReading,
@@ -106,13 +109,14 @@ class TestGetConsumptionReport:
 
 
 class TestGetPdf:
-    def _make_stream_mock(self, content: bytes, status_code: int = 200) -> MagicMock:
-        """Return a mock context-manager response that streams *content* in one chunk."""
+    def _make_send_mock(self, content: bytes, status_code: int = 200) -> MagicMock:
+        """Return a mock response as returned by ``httpx.Client.send(..., stream=True)``."""
         mock_resp: MagicMock = MagicMock()
         mock_resp.raise_for_status = MagicMock()
         mock_resp.iter_bytes.return_value = iter([content])
-        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.headers = httpx.Headers({})
+        mock_resp.extensions = {}
+        mock_resp.close = MagicMock()
         if status_code != 200:
             mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
                 "", request=MagicMock(), response=MagicMock(status_code=status_code)
@@ -120,8 +124,8 @@ class TestGetPdf:
         return mock_resp
 
     def test_returns_pdf_bytes(self, client: Md24deClient) -> None:
-        mock_resp = self._make_stream_mock(b"%PDF-1.4 fake")
-        with patch.object(client._http, "stream", return_value=mock_resp):  # pyright: ignore[reportPrivateUsage]
+        mock_resp = self._make_send_mock(b"%PDF-1.4 fake")
+        with patch.object(client._http, "send", return_value=mock_resp):  # pyright: ignore[reportPrivateUsage]
             pdf = client.get_pdf()
         assert isinstance(pdf, bytes)
         assert pdf.startswith(b"%PDF-")
@@ -129,9 +133,9 @@ class TestGetPdf:
     def test_raises_for_non_pdf_response(self, client: Md24deClient) -> None:
         from md24de import ParseError  # noqa: PLC0415
 
-        mock_resp = self._make_stream_mock(b"<html>Not a PDF</html>")
+        mock_resp = self._make_send_mock(b"<html>Not a PDF</html>")
         with (
-            patch.object(client._http, "stream", return_value=mock_resp),  # pyright: ignore[reportPrivateUsage]
+            patch.object(client._http, "send", return_value=mock_resp),  # pyright: ignore[reportPrivateUsage]
             pytest.raises(ParseError),
         ):
             client.get_pdf()
@@ -140,12 +144,13 @@ class TestGetPdf:
         from md24de._client import _MAX_RESPONSE_BYTES  # pyright: ignore[reportPrivateUsage]
 
         oversized = b"%PDF-" + b"x" * _MAX_RESPONSE_BYTES
-        mock_resp = self._make_stream_mock(oversized)
+        mock_resp = self._make_send_mock(oversized)
         with (
-            patch.object(client._http, "stream", return_value=mock_resp),  # pyright: ignore[reportPrivateUsage]
+            patch.object(client._http, "send", return_value=mock_resp),  # pyright: ignore[reportPrivateUsage]
             pytest.raises(Md24deError, match="2 MB limit"),
         ):
             client.get_pdf()
+
 
 
 class TestContextManager:
@@ -307,3 +312,117 @@ class TestResponseSizeLimit:
         c = self._make_client_with_transport(httpx.MockTransport(handler), sample_report)
         with pytest.raises(Md24deError, match="2 MB limit"):
             c._fetch_consumption_html()  # pyright: ignore[reportPrivateUsage]
+
+
+class _TraceRecorder:
+    """Collects (request, response) pairs passed to an HttpTraceCallback."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[HttpRequestTrace, HttpResponseTrace | None]] = []
+
+    def __call__(self, request: HttpRequestTrace, response: HttpResponseTrace | None) -> None:
+        self.calls.append((request, response))
+
+
+class TestHttpTraceCallback:
+    """Verify http_trace_callback is invoked correctly for get_pdf/_fetch_consumption_html."""
+
+    def _make_client_with_transport(
+        self,
+        transport: httpx.MockTransport,
+        sample_report: ConsumptionReport,
+        http_trace_callback: HttpTraceCallback | None = None,
+    ) -> Md24deClient:
+        available = AvailableMonth(year=2026, month=5)
+        with (
+            patch("md24de._client.login"),
+            patch("md24de._client.logout"),
+            patch("md24de._client.parse_available_month", return_value=available),
+            patch("md24de._client.parse_consumption_html", return_value=sample_report),
+            patch.object(Md24deClient, "_fetch_consumption_html", return_value="<stub>"),
+        ):
+            c = Md24deClient(
+                tenant="xy",
+                username="u",
+                password="p",  # noqa: S106  # NOSONAR
+                http_trace_callback=http_trace_callback,
+            )
+        c._http.close()  # pyright: ignore[reportPrivateUsage]
+        c._http = httpx.Client(transport=transport, base_url="https://legacy.messdienst24.de")  # pyright: ignore[reportPrivateUsage]
+        return c
+
+    def test_callback_called_on_success(self, sample_report: ConsumptionReport) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=b"%PDF-1.4 fake", request=request)
+
+        recorder = _TraceRecorder()
+        c = self._make_client_with_transport(
+            httpx.MockTransport(handler), sample_report, recorder
+        )
+        c.get_pdf()
+        assert len(recorder.calls) == 1
+        req_trace, resp_trace = recorder.calls[0]
+        assert req_trace.method == "GET"
+        assert resp_trace is not None
+        assert resp_trace.status_code == 200
+
+    def test_callback_called_on_http_error(self, sample_report: ConsumptionReport) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(404, request=request)
+
+        recorder = _TraceRecorder()
+        c = self._make_client_with_transport(
+            httpx.MockTransport(handler), sample_report, recorder
+        )
+        with pytest.raises(Md24deError):
+            c.get_pdf()
+        assert len(recorder.calls) == 1
+        _, resp_trace = recorder.calls[0]
+        assert resp_trace is not None
+        assert resp_trace.status_code == 404
+
+    def test_callback_called_on_network_error(self, sample_report: ConsumptionReport) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("connection refused")
+
+        recorder = _TraceRecorder()
+        c = self._make_client_with_transport(
+            httpx.MockTransport(handler), sample_report, recorder
+        )
+        with pytest.raises(Md24deError):
+            c.get_pdf()
+        assert len(recorder.calls) == 1
+        req_trace, resp_trace = recorder.calls[0]
+        assert req_trace.method == "GET"
+        assert resp_trace is None
+
+    def test_callback_not_called_when_none(self, sample_report: ConsumptionReport) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, content=b"%PDF-1.4 fake", request=request)
+
+        c = self._make_client_with_transport(httpx.MockTransport(handler), sample_report, None)
+        # Should not raise even though no callback is configured.
+        c.get_pdf()
+
+    def test_callback_never_called_for_login(self, sample_report: ConsumptionReport) -> None:
+        """login()/logout() are patched out entirely in the fixture and never touch
+        the traced request path, so the callback must never fire for them."""
+        available = AvailableMonth(year=2026, month=5)
+        recorder = _TraceRecorder()
+        with (
+            patch("md24de._client.login") as mock_login,
+            patch("md24de._client.logout") as mock_logout,
+            patch("md24de._client.parse_available_month", return_value=available),
+            patch("md24de._client.parse_consumption_html", return_value=sample_report),
+            patch.object(Md24deClient, "_fetch_consumption_html", return_value="<stub>"),
+        ):
+            c = Md24deClient(
+                tenant="xy",
+                username="u",
+                password="p",  # noqa: S106  # NOSONAR
+                http_trace_callback=recorder,
+            )
+            c.close()
+        mock_login.assert_called_once()
+        mock_logout.assert_called_once()
+        assert recorder.calls == []

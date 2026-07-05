@@ -99,6 +99,7 @@ Md24deClient(
     username: str,
     password: str,
     timeout: float = 30.0,
+    http_trace_callback: HttpTraceCallback | None = None,
 )
 ```
 
@@ -120,6 +121,73 @@ closed, or call `.close()` manually.
 | `get_consumption_report()` | `ConsumptionReport` | Full consumption data; lazy-parsed and cached |
 | `get_pdf()` | `bytes` | Raw PDF bytes for the available month |
 | `close()` | `None` | Log out and close the HTTP connection |
+
+### HTTP request/response tracing
+
+Pass `http_trace_callback` to observe every HTTP request/response pair made by the client
+(e.g. for audit logging or troubleshooting). The callback is called exactly once per request,
+whether it succeeded or failed, and is **never called for the login/logout requests** — so
+credentials are never exposed through it. It only ever receives plain, library-owned data
+(`HttpRequestTrace` / `HttpResponseTrace`), never an `httpx` object.
+
+```python
+from md24de import Md24deClient, HttpRequestTrace, HttpResponseTrace
+
+def my_trace_callback(request: HttpRequestTrace, response: HttpResponseTrace | None) -> None:
+    print(request.method, request.url, "->", response.status_code if response else "no response")
+
+with Md24deClient(
+    tenant="xy",
+    username="your_user",
+    ******
+    http_trace_callback=my_trace_callback,
+) as client:
+    ...
+```
+
+| Type | Description |
+|---|---|
+| `HttpTraceCallback` | `Callable[[HttpRequestTrace, HttpResponseTrace \| None], None]` |
+| `HttpRequestTrace` | `method`, `url` (incl. query string), `headers` (multi-valued, unmasked), `body` (`str \| None`, only if textual) |
+| `HttpResponseTrace` | `status_code`, `headers` (multi-valued, unmasked), `body` (`str \| None`, only if textual), `tls_version` (`str \| None`, e.g. `"TLSv1.3"`) |
+
+A ready-to-use default implementation, `FileHttpTraceLogger`, appends a timestamped,
+numbered, human-readable trace of every request/response to a file. `Cookie`/`Set-Cookie`
+header values are always masked in this rendered text:
+
+```python
+from md24de import Md24deClient, FileHttpTraceLogger
+
+with Md24deClient(
+    tenant="xy",
+    username="your_user",
+    ******
+    http_trace_callback=FileHttpTraceLogger("md24de-http-trace.log"),
+) as client:
+    ...
+```
+
+Produces entries like:
+
+```
+=== 1 === 2026-07-05T20:20:22.797846+00:00 ===
+> POST https://legacy.messdienst24.de/
+> Host: legacy.messdienst24.de
+> Cookie: ***
+> Content-Type: application/x-www-form-urlencoded
+>
+action=objverbmiet&node=content
+
+< 200 [TLSv1.3]
+< Content-Type: text/html; charset=UTF-8
+< Set-Cookie: ***
+<
+<html>...</html>
+```
+
+Use `format_http_trace(request, response, sequence=...)` directly if you want the same
+formatted text routed to a different sink (e.g. a logger or a cloud log stream, which is
+preferable to writing to a temp file in ephemeral environments like AWS Lambda).
 
 ### Models
 

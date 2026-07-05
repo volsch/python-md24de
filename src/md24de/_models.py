@@ -85,6 +85,54 @@ class ObjectInfo:
 
 
 @dataclass(frozen=True)
+class HttpRequestTrace:
+    """Snapshot of an outgoing HTTP request, passed to an ``HttpTraceCallback``.
+
+    Never produced for the login/logout requests, so credentials are never exposed
+    through this type.
+    """
+
+    method: str
+    """HTTP method, e.g. ``"GET"`` or ``"POST"``."""
+
+    url: str
+    """Complete request URL, including any query parameters."""
+
+    headers: tuple[tuple[str, str], ...]
+    """Request headers as ``(name, value)`` pairs, unmasked. A header name may appear
+    more than once if it was sent multiple times. Callers that persist or display
+    these headers should mask the ``Cookie`` value themselves; the default
+    ``format_http_trace``/``FileHttpTraceLogger`` implementation does this."""
+
+    body: str | None
+    """Textual request body, or ``None`` if the request has no body, or the body is
+    not textual."""
+
+
+@dataclass(frozen=True)
+class HttpResponseTrace:
+    """Snapshot of an HTTP response, passed to an ``HttpTraceCallback``."""
+
+    status_code: int
+    """HTTP status code."""
+
+    headers: tuple[tuple[str, str], ...]
+    """Response headers as ``(name, value)`` pairs, unmasked. A header name may
+    appear more than once if it was sent multiple times (e.g. ``Set-Cookie``).
+    Callers that persist or display these headers should mask the ``Set-Cookie``
+    value themselves; the default ``format_http_trace``/``FileHttpTraceLogger``
+    implementation does this."""
+
+    body: str | None
+    """Textual response body, or ``None`` if the body is not textual or was not
+    (fully) read, e.g. because the request failed."""
+
+    tls_version: str | None
+    """Negotiated TLS protocol version (e.g. ``"TLSv1.3"``), or ``None`` if the
+    connection was not encrypted or the version could not be determined."""
+
+
+@dataclass(frozen=True)
 class ConsumptionReport:
     """Full consumption report as returned by the portal.
 

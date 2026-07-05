@@ -42,10 +42,17 @@ from md24de._exceptions import (  # noqa: E402
     Md24deError,
     ParseError,
 )
+from md24de._http_trace import (  # noqa: E402
+    FileHttpTraceLogger,
+    HttpTraceCallback,
+    format_http_trace,
+)
 from md24de._models import (  # noqa: E402
     AvailableMonth,
     Comparison,
     ConsumptionReport,
+    HttpRequestTrace,
+    HttpResponseTrace,
     MeterReading,
     MeterReport,
     ObjectInfo,
@@ -64,11 +71,17 @@ __all__ = [
     "AvailableMonth",
     "Comparison",
     "ConsumptionReport",
+    "HttpRequestTrace",
+    "HttpResponseTrace",
     "MeterReading",
     "MeterReport",
     "ObjectInfo",
     # Constants
     "GERMAN_MONTH_NAMES",
+    # HTTP tracing
+    "FileHttpTraceLogger",
+    "HttpTraceCallback",
+    "format_http_trace",
     # Session-independent helpers
     "dump_consumption_report",
     "load_consumption_report",
