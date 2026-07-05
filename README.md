@@ -25,8 +25,10 @@ Provides typed, programmatic access to heating and hot-water consumption data an
 - Parse structured heating and hot-water consumption data (current usage, household averages,
   month-over-month and year-over-year comparisons, historical readings)
 - Download the monthly PDF document
+- Serialize/deserialize a parsed report to/from compact JSON, and render your own simplified
+  UVI PDF from it — both work offline, with no portal access required
 - Fully typed — passes **pyright strict** with zero errors
-- Minimal dependencies: `httpx`, `beautifulsoup4`, `lxml`, `json5`
+- Minimal dependencies: `httpx`, `beautifulsoup4`, `lxml`, `json5`, `reportlab`
 - Python 3.12+
 
 ## Installation
@@ -152,8 +154,8 @@ parsing the full report — note that it reflects the state at login time.
 
 | Field | Type | Description |
 |---|---|---|
-| `current_kwh` | `float` | Your consumption this month in kWh eq |
-| `average_kwh` | `float` | Average of comparable households in kWh eq |
+| `current_kwh` | `float \| None` | Your consumption this month in kWh eq (`None` if the portal did not supply a value — distinct from an actual 0 kWh reading) |
+| `average_kwh` | `float \| None` | Average of comparable households in kWh eq (`None` if the portal did not supply a value) |
 | `vs_average` | `Comparison \| None` | Compared to comparable households (`None` if unavailable) |
 | `vs_previous_month` | `Comparison \| None` | Compared to last month (`None` if unavailable) |
 | `vs_previous_year` | `Comparison \| None` | Compared to same month last year (`None` if unavailable) |
@@ -165,8 +167,8 @@ parsing the full report — note that it reflects the state at login time.
 |---|---|---|
 | `year` | `int` | Four-digit year |
 | `month` | `int` | Month number (1–12) |
-| `your_kwh` | `float` | Your consumption for that month in kWh eq |
-| `average_kwh` | `float` | Average of comparable households for that month in kWh eq |
+| `your_kwh` | `float \| None` | Your consumption for that month in kWh eq (`None` if the portal did not supply a value) |
+| `average_kwh` | `float \| None` | Average of comparable households for that month in kWh eq (`None` if the portal did not supply a value) |
 
 #### `Comparison`
 
@@ -201,10 +203,13 @@ uvi_pdf_bytes = render_consumption_report_pdf(report)
 ```
 
 `render_consumption_report_pdf()` produces a one-page PDF containing only the period
-(`UVI <Month> <Year>`), the values required by § 6a HeizkostenV (your consumption, the
+(`UVI <Month> <Year>`), the values required by § 6a Absatz 2 HeizkostenV (your consumption, the
 comparable-household average, and the vs.-average/vs.-previous-month/vs.-previous-year
 comparisons), and the mandatory disclosure notice. It deliberately omits the address and
-object number present in the portal's own PDF (see `get_pdf()`).
+object number present in the portal's own PDF (see `get_pdf()`). It covers only the monthly
+disclosure items of Absatz 2 — annual-billing items required by Absatz 3 (e.g. contact info,
+dispute-resolution info, the weather-adjusted year-over-year graphic) are out of scope, since
+they belong to a different document (the annual `Abrechnung`, not the monthly UVI).
 
 `GERMAN_MONTH_NAMES` is a public constant mapping month numbers (1-12) to their German
 names (e.g. `{5: "Mai"}`), for callers that need to render a German month name (e.g. in

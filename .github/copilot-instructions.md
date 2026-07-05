@@ -7,12 +7,12 @@ Parses heating/hot-water consumption HTML and exposes a clean, minimal public AP
 
 ## Language & runtime
 
-- Python 3.13+ only; use 3.13-compatible syntax
+- Python 3.12+; use 3.12-compatible syntax
 - All files start with `from __future__ import annotations`
 
 ## Code style
 
-- Formatter/linter: **ruff** (`line-length = 100`, target `py313`)
+- Formatter/linter: **ruff** (`line-length = 100`, target `py312`)
 - Active ruff rules: `E, F, I, N, W, UP, ANN, S, B, C4, PIE, RET, SIM` — all annotations required (`ANN`)
 - Type checker: **pyright strict** — every function must be fully annotated; no `Any` unless unavoidable
 - Private module files are prefixed with `_` (e.g. `_client.py`, `_parser.py`)
