@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from dataclasses import dataclass
 from types import TracebackType
 
 import httpx
@@ -39,6 +40,22 @@ _DEFAULT_HEADERS: dict[str, str] = {
 }
 
 
+@dataclass(frozen=True)
+class ClientOptions:
+    """Optional settings for :class:`Md24deClient`, grouped to leave room for
+    future additions without growing the constructor's parameter list."""
+
+    timeout: float = 30.0
+    """HTTP request timeout in seconds."""
+
+    http_trace_callback: HttpTraceCallback | None = None
+    """Optional callback invoked for every non-authentication HTTP request/response
+    pair (see :data:`~md24de.HttpTraceCallback`). Called exactly once per request,
+    even if it fails. Never called for the login/logout requests, so credentials
+    are never exposed through it. Use :class:`~md24de.FileHttpTraceLogger` for a
+    ready-to-use implementation that appends a timestamped trace to a file."""
+
+
 class Md24deClient:
     """Client for the messdienst24.de utility-consumption portal.
 
@@ -63,13 +80,8 @@ class Md24deClient:
         tenant: Portal tenant identifier (e.g. ``"xy"``).
         username: Portal username.
         password: Portal password.
-        timeout: HTTP request timeout in seconds (default 30).
-        http_trace_callback: Optional callback invoked for every non-authentication
-            HTTP request/response pair (see :data:`~md24de.HttpTraceCallback`).
-            Called exactly once per request, even if it fails. Never called for the
-            login/logout requests, so credentials are never exposed through it. Use
-            :class:`~md24de.FileHttpTraceLogger` for a ready-to-use implementation
-            that appends a timestamped trace to a file.
+        options: Optional settings (timeout, HTTP trace callback, …). See
+            :class:`ClientOptions`. Defaults to ``ClientOptions()`` if omitted.
 
     Raises:
         LoginError: If authentication fails.
@@ -82,14 +94,14 @@ class Md24deClient:
         tenant: str,
         username: str,
         password: str,
-        timeout: float = 30.0,
-        http_trace_callback: HttpTraceCallback | None = None,
+        options: ClientOptions | None = None,
     ) -> None:
+        options = options if options is not None else ClientOptions()
         self._tenant = tenant
-        self._http_trace_callback = http_trace_callback
+        self._http_trace_callback = options.http_trace_callback
         self._http = httpx.Client(
             headers=_DEFAULT_HEADERS,
-            timeout=timeout,
+            timeout=options.timeout,
             follow_redirects=True,
         )
         # Populated lazily on the first get_consumption_report() call.

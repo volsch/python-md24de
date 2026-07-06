@@ -36,7 +36,7 @@ import logging
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
-from md24de._client import Md24deClient  # noqa: E402
+from md24de._client import ClientOptions, Md24deClient  # noqa: E402
 from md24de._exceptions import (  # noqa: E402
     LoginError,
     Md24deError,
@@ -67,6 +67,7 @@ from md24de._serialization import (  # noqa: E402
 __all__ = [
     # Client
     "Md24deClient",
+    "ClientOptions",
     # Models
     "AvailableMonth",
     "Comparison",

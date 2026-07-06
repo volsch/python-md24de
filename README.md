@@ -98,6 +98,10 @@ Md24deClient(
     tenant: str,
     username: str,
     password: str,
+    options: ClientOptions | None = None,
+)
+
+ClientOptions(
     timeout: float = 30.0,
     http_trace_callback: HttpTraceCallback | None = None,
 )
@@ -124,14 +128,14 @@ closed, or call `.close()` manually.
 
 ### HTTP request/response tracing
 
-Pass `http_trace_callback` to observe every HTTP request/response pair made by the client
-(e.g. for audit logging or troubleshooting). The callback is called exactly once per request,
+Pass `http_trace_callback` via `ClientOptions` to observe every HTTP request/response pair made
+by the client (e.g. for audit logging or troubleshooting). The callback is called exactly once per request,
 whether it succeeded or failed, and is **never called for the login/logout requests** — so
 credentials are never exposed through it. It only ever receives plain, library-owned data
 (`HttpRequestTrace` / `HttpResponseTrace`), never an `httpx` object.
 
 ```python
-from md24de import Md24deClient, HttpRequestTrace, HttpResponseTrace
+from md24de import Md24deClient, ClientOptions, HttpRequestTrace, HttpResponseTrace
 
 def my_trace_callback(request: HttpRequestTrace, response: HttpResponseTrace | None) -> None:
     print(request.method, request.url, "->", response.status_code if response else "no response")
@@ -140,7 +144,7 @@ with Md24deClient(
     tenant="xy",
     username="your_user",
     ******
-    http_trace_callback=my_trace_callback,
+    options=ClientOptions(http_trace_callback=my_trace_callback),
 ) as client:
     ...
 ```
@@ -156,13 +160,13 @@ numbered, human-readable trace of every request/response to a file. `Cookie`/`Se
 header values are always masked in this rendered text:
 
 ```python
-from md24de import Md24deClient, FileHttpTraceLogger
+from md24de import Md24deClient, ClientOptions, FileHttpTraceLogger
 
 with Md24deClient(
     tenant="xy",
     username="your_user",
     ******
-    http_trace_callback=FileHttpTraceLogger("md24de-http-trace.log"),
+    options=ClientOptions(http_trace_callback=FileHttpTraceLogger("md24de-http-trace.log")),
 ) as client:
     ...
 ```

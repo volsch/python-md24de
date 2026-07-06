@@ -172,7 +172,9 @@ class FileHttpTraceLogger:
             tenant="xy",
             username="…",
             ******
-            http_trace_callback=FileHttpTraceLogger("md24de-http-trace.log"),
+            options=ClientOptions(
+                http_trace_callback=FileHttpTraceLogger("md24de-http-trace.log"),
+            ),
         )
     """
 

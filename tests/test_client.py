@@ -10,6 +10,7 @@ import pytest
 
 from md24de import (
     AvailableMonth,
+    ClientOptions,
     Comparison,
     ConsumptionReport,
     HttpRequestTrace,
@@ -345,7 +346,7 @@ class TestHttpTraceCallback:
                 tenant="xy",
                 username="u",
                 password="p",  # noqa: S106  # NOSONAR
-                http_trace_callback=http_trace_callback,
+                options=ClientOptions(http_trace_callback=http_trace_callback),
             )
         c._http.close()  # pyright: ignore[reportPrivateUsage]
         c._http = httpx.Client(transport=transport, base_url="https://legacy.messdienst24.de")  # pyright: ignore[reportPrivateUsage]
@@ -420,7 +421,7 @@ class TestHttpTraceCallback:
                 tenant="xy",
                 username="u",
                 password="p",  # noqa: S106  # NOSONAR
-                http_trace_callback=recorder,
+                options=ClientOptions(http_trace_callback=recorder),
             )
             c.close()
         mock_login.assert_called_once()
