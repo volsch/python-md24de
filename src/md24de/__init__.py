@@ -42,6 +42,7 @@ from md24de._exceptions import (  # noqa: E402
     LoginError,
     Md24deError,
     ParseError,
+    PdfNotAvailableError,
 )
 from md24de._http_trace import (  # noqa: E402
     FileHttpTraceLogger,
@@ -80,6 +81,9 @@ def __getattr__(name: str) -> object:
     :class:`Md24deClient` for HTML parsing or the JSON helpers).
     """
     if name == "render_consumption_report_pdf":
+        from md24de._pdf_check import check_reportlab_available
+
+        check_reportlab_available()
         from md24de._pdf import render_consumption_report_pdf as _render_consumption_report_pdf
 
         return _render_consumption_report_pdf
@@ -113,4 +117,5 @@ __all__ = [
     "Md24deError",
     "LoginError",
     "ParseError",
+    "PdfNotAvailableError",
 ]

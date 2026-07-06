@@ -29,6 +29,7 @@ Parses heating/hot-water consumption HTML and exposes a clean, minimal public AP
 - All library exceptions inherit from `Md24deError` (defined in `_exceptions.py`)
 - Raise `ParseError` for unexpected HTML structure
 - Raise `LoginError` when authentication fails
+- Raise `PdfNotAvailableError` when PDF rendering is requested but the `[pdf]` optional extra (`reportlab`) is not installed
 - Never raise built-in exceptions directly to callers
 
 ## HTTP client

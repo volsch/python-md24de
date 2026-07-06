@@ -28,7 +28,7 @@ Provides typed, programmatic access to heating and hot-water consumption data an
 - Serialize/deserialize a parsed report to/from compact JSON, and render your own simplified
   UVI PDF from it — both work offline, with no portal access required
 - Fully typed — passes **pyright strict** with zero errors
-- Minimal dependencies: `httpx`, `beautifulsoup4`, `lxml`, `json5`, `reportlab`
+- Minimal dependencies: `httpx`, `beautifulsoup4`, `lxml`, `json5` (PDF rendering is an optional extra)
 - Python 3.12+
 
 ## Installation
@@ -41,10 +41,22 @@ This library is not published on PyPI. Install directly from a GitHub release.
 pip install "git+https://github.com/volsch/python-md24de.git@vX.Y.Z"
 ```
 
+To include PDF rendering support (requires `reportlab`):
+
+```bash
+pip install "git+https://github.com/volsch/python-md24de.git@vX.Y.Z#egg=python-md24de[pdf]"
+```
+
 Or with [uv](https://github.com/astral-sh/uv):
 
 ```bash
 uv add "git+https://github.com/volsch/python-md24de.git@vX.Y.Z"
+```
+
+To include PDF rendering support:
+
+```bash
+uv add "git+https://github.com/volsch/python-md24de.git@vX.Y.Z[pdf]"
 ```
 
 Alternatively, download the pre-built wheel directly from the
@@ -260,7 +272,7 @@ access — useful for archiving data or re-generating output from stored reports
 |---|---|---|
 | `dump_consumption_report(report)` | `str` | Compact JSON serialization; fields with `None` are omitted |
 | `load_consumption_report(data)` | `ConsumptionReport` | Parses JSON produced by `dump_consumption_report()` |
-| `render_consumption_report_pdf(report)` | `bytes` | Renders a simplified UVI PDF (no address/object number) |
+| `render_consumption_report_pdf(report)` | `bytes` | Renders a simplified UVI PDF (no address/object number); requires the `[pdf]` extra |
 
 ```python
 from md24de import (
@@ -294,6 +306,7 @@ custom reports or emails) without duplicating the mapping.
 | `Md24deError` | Base class for all library errors |
 | `LoginError` | Authentication fails |
 | `ParseError` | Page HTML cannot be parsed as expected — may indicate the portal's structure has changed |
+| `PdfNotAvailableError` | `render_consumption_report_pdf()` is called but the `[pdf]` extra is not installed |
 
 ## Development
 
