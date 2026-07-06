@@ -6,6 +6,11 @@ import io
 import logging
 from collections.abc import Callable
 
+from md24de._pdf_check import check_reportlab_available
+
+# Check at module import time that reportlab is available
+check_reportlab_available()
+
 from reportlab.graphics.charts.barcharts import VerticalBarChart
 from reportlab.graphics.shapes import Drawing
 from reportlab.lib import colors
