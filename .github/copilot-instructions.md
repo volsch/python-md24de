@@ -43,6 +43,14 @@ Parses heating/hot-water consumption HTML and exposes a clean, minimal public AP
 - HTML parsing uses **BeautifulSoup4 + lxml**; JSON-like data uses **json5**
 - All parsing logic lives in `_parser.py`
 
+## PDF rendering & notices
+
+- PDF rendering lives in `_pdf.py` and depends on **reportlab**, which is an *optional* `[pdf]` extra — never a hard runtime dependency
+- Import `reportlab` (and anything from `_pdf.py`) **lazily**, never at module top level of eagerly-imported modules: `__init__.py` defers `render_consumption_report_pdf` via `__getattr__`, and `Md24deClient.get_pdf()` imports it inside the method
+- Before the lazy `_pdf` import, call `check_reportlab_available()` from `_pdf_check.py` so a missing extra raises `PdfNotAvailableError` instead of a raw `ImportError`
+- Static, session-independent legal notices live in `_notices.py` (no reportlab dependency); `get_uvi_disclosure_note()` returns the UVI disclosure text and `_pdf.py` uses it rather than duplicating the text
+- The UVI disclosure note is a voluntary clarification, **not** a § 6a Abs. 2 HeizkostenV Pflichtangabe (the law mandates only the three data items: consumption, month/year comparison, average comparison)
+
 ## Logging
 
 - Every `_*.py` module has `_log = logging.getLogger(__name__)` at module level

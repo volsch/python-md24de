@@ -15,6 +15,7 @@ from md24de import (
     MeterReading,
     MeterReport,
     ObjectInfo,
+    get_uvi_disclosure_note,
     render_consumption_report_pdf,
 )
 from md24de._pdf import (  # pyright: ignore[reportPrivateUsage]
@@ -160,9 +161,15 @@ class TestRenderConsumptionReportPdf:
     def test_contains_note(self, report: ConsumptionReport) -> None:
         text = _pdf_text(render_consumption_report_pdf(report))
         assert "Hinweis" in text
-        assert "Heizkostenverordnung" in text
         assert "UVI" in text
-        assert "§ 6a Absatz 2" in text
+        assert "Orientierung" in text
+
+    def test_uses_get_uvi_disclosure_note(self, report: ConsumptionReport) -> None:
+        """The PDF must embed exactly the text returned by get_uvi_disclosure_note()."""
+        text = _pdf_text(render_consumption_report_pdf(report))
+        # PDF text extraction collapses whitespace/line breaks, so compare word-by-word.
+        for word in get_uvi_disclosure_note().split():
+            assert word in text
 
     def test_no_history_raises_md24de_error(self) -> None:
         empty_meter = MeterReport(

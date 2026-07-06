@@ -1,1 +1,63 @@
-<!DOCTYPE html>   <!-- obj begin-->  <div id="mietstart" class="obj"><div class="ui-widget-header ui-button-text-only"><div class="ui-button-text">Verbrauch</div></div><style>.mtab {min-height: 180px; max-height: 300px; overflow: scroll; border: 1px solid #aaa !important; padding: 10px !important;}.mtab canvas {max-height: 300px;}.mtab table th {background-color: #aaa; color: #fff; padding: 2px 20px 2px 20px}.mtab table td {background-color: #f6f6f6; padding: 2px 20px 2px 20px}.mietverbcontent img {margin-right: 10px;}</style><div class="ui-widget ui-widget-content mietverbcontent" style="min-height: 350px;"><div style="padding: 10px;"><a href="?format=pdf"><img src="images/file_pdf.gif">Diese Verbrauchsinformation als PDF-Datei herunterladen.</a></div><div style="margin:10px; padding: 10px;"><h1 style="margin-top:0px;">Heizung</h1><div><div><span style="color:#000000; font-size: 16px;">Sie haben im Mai 2026 </span><span style="color:#00aa00; font-size: 16px;">weniger</span><span style="color:#000000; font-size: 16px;"> als vergleichbare Haushalte verbraucht.</span> </div><div><span style="color:#000000; font-size: 16px;"> </span> </div><div><span style="color:#000000; font-size: 16px;">Sie haben im Mai 2026 </span><span style="color:#00aa00; font-size: 16px;">weniger</span><span style="color:#000000; font-size: 16px;"> als im Mai 2025 verbraucht.</span> </div> <br><br></div><div><canvas id="chart_med_0024-001_hz"> </canvas></div><script>var ctx = document.getElementById('chart_med_0024-001_hz').getContext('2d');var chart = new Chart(ctx, {type: 'bar',data: {labels: ['Mai 2026','April 2026','Mai 2025', ],datasets: [{label: 'Ihr Verbrauch in kWh &auml;q ',backgroundColor: '#D90000',borderColor: '#D90000', data: ['15','145','140', ]},{label: 'Verbrauch in kWh &auml;q vergleichbare Haushalte',backgroundColor: '#888888',borderColor: '#888888', data: ['210','305','210', ]}]},options: {legend:{display:true, position: 'bottom'},   scales: {yAxes: [ {  scaleLabel: {display: true,labelString: 'kWh &auml;q'},    display: true,ticks: {beginAtZero: true}  }]}}});chart.data.datasets[0].label = chart.data.datasets[0].label.replace('&sup3;',decodeURI('%C2%B3'));chart.data.datasets[0].label = chart.data.datasets[0].label.replace('&auml;',decodeURI('%C3%A4'));chart.data.datasets[1].label = chart.data.datasets[1].label.replace('&auml;',decodeURI('%C3%A4'));chart.options.scales.yAxes[0].scaleLabel.labelString = chart.options.scales.yAxes[0].scaleLabel.labelString.replace('&auml;',decodeURI('%C3%A4'));chart.options.scales.yAxes[0].scaleLabel.labelString = chart.options.scales.yAxes[0].scaleLabel.labelString.replace('&sup3;',decodeURI('%C2%B3'));chart.data.labels.forEach( function(e,i,a) {a[i] = e.replace('&auml;',decodeURI('%C3%A4')) } );chart.data.datasets[1].label = chart.data.datasets[1].label.replace('&sup3;',decodeURI('%C2%B3'));chart.update();</script></div><div style="margin:10px; padding: 10px;"><h1 style="margin-top:0px;">Warmwasser</h1><div><div><span style="color:#000000; font-size: 16px;">Sie haben im Mai 2026 </span><span style="color:#00aa00; font-size: 16px;">weniger</span><span style="color:#000000; font-size: 16px;"> als vergleichbare Haushalte verbraucht.</span> </div><div><span style="color:#000000; font-size: 16px;">Sie haben im Mai 2026 </span><span style="color:#00aa00; font-size: 16px;">weniger</span><span style="color:#000000; font-size: 16px;"> als im April 2026 verbraucht.</span> </div><div><span style="color:#000000; font-size: 16px;">Sie haben im Mai 2026 </span><span style="color:#00aa00; font-size: 16px;">weniger</span><span style="color:#000000; font-size: 16px;"> als im Mai 2025 verbraucht.</span> </div> <br><br></div><div><canvas id="chart_med_0024-001_ww"> </canvas></div><script>var ctx = document.getElementById('chart_med_0024-001_ww').getContext('2d');var chart = new Chart(ctx, {type: 'bar',data: {labels: ['Mai 2026','April 2026','Mai 2025', ],datasets: [{label: 'Ihr Verbrauch in kWh &auml;q ',backgroundColor: '#E8B606',borderColor: '#E8B606', data: ['55','60','58', ]},{label: 'Verbrauch in kWh &auml;q vergleichbare Haushalte',backgroundColor: '#888888',borderColor: '#888888', data: ['65','62','65', ]}]},options: {legend:{display:true, position: 'bottom'},   scales: {yAxes: [ {  scaleLabel: {display: true,labelString: 'kWh &auml;q'},    display: true,ticks: {beginAtZero: true}  }]}}});chart.data.datasets[0].label = chart.data.datasets[0].label.replace('&sup3;',decodeURI('%C2%B3'));chart.data.datasets[0].label = chart.data.datasets[0].label.replace('&auml;',decodeURI('%C3%A4'));chart.data.datasets[1].label = chart.data.datasets[1].label.replace('&auml;',decodeURI('%C3%A4'));chart.options.scales.yAxes[0].scaleLabel.labelString = chart.options.scales.yAxes[0].scaleLabel.labelString.replace('&auml;',decodeURI('%C3%A4'));chart.options.scales.yAxes[0].scaleLabel.labelString = chart.options.scales.yAxes[0].scaleLabel.labelString.replace('&sup3;',decodeURI('%C2%B3'));chart.data.labels.forEach( function(e,i,a) {a[i] = e.replace('&auml;',decodeURI('%C3%A4')) } );chart.data.datasets[1].label = chart.data.datasets[1].label.replace('&sup3;',decodeURI('%C2%B3'));chart.update();</script></div><none><none><div>&nbsp;<br>&nbsp;<br>&nbsp;<br></div><script>$( ".button" ).button();</script></div></div>        <!-- obj end--><!-- obj begin-->       <div class="objbox ui-button-text-only" onmouseover="$('#objhelpbox').addClass('helpfilled'); $('#objhelptext').html('Dies ist das aktuell ausgewählte Objekt.');" onmouseleave="$('#objhelpbox').removeClass('helpfilled'); $('#objhelptext').html(' ');" id="selectedobjbox"><div class="ui-widget-header ui-button-text" onclick="$('#selectedobjbox').find('.objbox-content').toggleClass('hideonmob')"><span>ausgew&auml;hltes Objekt</span></div><div class="objbox-content hideonmob"><div class="name">Objektnummer:</div><div class="value">000-000000&nbsp;</div><div class="name">Adresse:</div><div class="value">Musterstraße 1<br>12345 Musterstadt</div><div class="name">Abrechnungszeitraum:</div><div class="value">01.01.2025 - 31.12.2025</div><input type="hidden" id="objstatus" value="nodata"><input type="hidden" id="objstatuskost" value="nodata"><input type="hidden" id="objstatusnutz" value="nodata"><input type="hidden" id="aktabnr" value="0000000000"></div></div>  <div id="objhelpbox" class="objbox ui-button-text-only"><div class="ui-widget-header ui-button-text"><span>Hilfe</span></div><style>@-webkit-keyframes shadowblink{from {box-shadow: 0px 0px 10px #000000;} to {box-shadow : none;}} @-moz-keyframes shadowblink{from {box-shadow: 0px 0px 10px #000000;} to {box-shadow : none;}} @keyframes shadowblink { from {box-shadow: 0px 0px 10px #000000;}    to {box-shadow : none;}}  .helpfilled {  -webkit-animation: shadowblink 1s;     -moz-animation: shadowblink 1s;    animation: shadowblink 1s;}</style><div class="objbox-content" id="objhelptext"><span> </span></div></div> <!-- obj end-->
+<!DOCTYPE html>
+<html>
+<head><title>UVI</title></head>
+<body>
+<div id="content" class="container">
+<div class="card"><div class="card-content"><h5>UVI</h5>
+<div class="row" style="border-bottom: 1px solid #eee;">
+<div class="col s12 m4">
+  <span class="field-label block">ausgewähltes Objekt</span>
+  <div class="mt-1">
+    <span class="field-value text-lg">000-000000</span><br>
+    <span class="text-gray-600">Musterstraße 1</span><br>
+    <span class="text-gray-600">12345 Musterstadt</span>
+  </div><br>
+</div>
+<div class="col s12 m4">
+  <span class="field-label block">aktuelle Abrechnung</span>
+  <span class="field-value">1000000000&nbsp;(01.01.2025&nbsp;-&nbsp;31.12.2025)</span>
+</div>
+<div class="col s12 m4">
+  <span class="field-label block">Hausverwaltung</span>
+  <div class="mt-1">
+    <span class="field-value text-lg">10000</span><br>
+    <span class="text-gray-600">Musterverwaltung GmbH</span><br>
+  </div>
+</div>
+</div>
+<div class="row">
+  <div class="col s12">
+    <ul class="tabs">
+      <li class="tab col s6 m3"><a href="#0001-001">0001-001&nbsp;&nbsp;Max Mustermann</a></li>
+    </ul>
+  </div>
+  <div id="0001-001" class="col s12"><br>Mieter: Max Mustermann<br><br>
+<div class="row" style="min-height: 650px;">
+	<div class="col s12 m12 l6" style="display: block">
+		<h5 style="margin-top:0px;">Heizung</h5>
+		<div><canvas id="100583bar" style="display: block; height: 400px; width: 500px;"></canvas></div><script>
+
+var chart = new Chart($('#100583bar'), {type: 'bar',data: {labels: ['Mai 2026','April 2026','Mai 2025'], datasets: [{label: 'Ihr Verbrauch in kWh &auml;q ', backgroundColor: '#D90000', borderColor: '#D90000', data: ['15','145','140']}, {label: 'Verbrauch in kWh &auml;q vergleichbare Haushalte', backgroundColor: '#888888', borderColor: '#888888', data: ['210','305','210']} ]}, options: {legend:{display:true, position: 'bottom'}, scales: {yAxes: [{scaleLabel: {display: true, labelString: 'kWh &auml;q'}, display: true, ticks: {beginAtZero: true}}]}}});
+chart.update();
+</script><br>
+		<div style="margin-left: 20px; font-size: 14px;">
+			Sie haben im Mai 2026 <span style="color:green">weniger</span> als vergleichbare Haushalte verbraucht.<br>Sie haben im Mai 2026 <span style="color:green">weniger</span> als im Mai 2025 verbraucht.<br>
+		</div><br><br>
+	</div>
+	<div class="col s12 m12 l6" style="display: block">
+		<h5 style="margin-top:0px;">Warmwasser</h5>
+		<div><canvas id="109070bar" style="display: block; height: 400px; width: 500px;"></canvas></div><script>
+
+var chart = new Chart($('#109070bar'), {type: 'bar',data: {labels: ['Mai 2026','April 2026','Mai 2025'], datasets: [{label: 'Ihr Verbrauch in kWh &auml;q ', backgroundColor: '#E8B606', borderColor: '#E8B606', data: ['55','60','58']}, {label: 'Verbrauch in kWh &auml;q vergleichbare Haushalte', backgroundColor: '#888888', borderColor: '#888888', data: ['65','62','65']} ]}, options: {legend:{display:true, position: 'bottom'}, scales: {yAxes: [{scaleLabel: {display: true, labelString: 'kWh &auml;q'}, display: true, ticks: {beginAtZero: true}}]}}});
+chart.update();
+</script><br>
+		<div style="margin-left: 20px; font-size: 14px;">
+			Sie haben im Mai 2026 <span style="color:green">weniger</span> als vergleichbare Haushalte verbraucht.<br>Sie haben im Mai 2026 <span style="color:green">weniger</span> als im April 2026 verbraucht.<br>Sie haben im Mai 2026 <span style="color:green">weniger</span> als im Mai 2025 verbraucht.<br>
+		</div><br><br>
+	</div>
+</div>
+</div>
+</div></div>
+</div>
+</body>
+</html>

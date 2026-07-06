@@ -10,7 +10,7 @@ from types import TracebackType
 import httpx
 
 from md24de._auth import login, logout
-from md24de._exceptions import Md24deError, ParseError
+from md24de._exceptions import Md24deError
 from md24de._http_trace import HttpTraceCallback, build_request_trace, build_response_trace
 from md24de._models import (
     AvailableMonth,
@@ -18,7 +18,7 @@ from md24de._models import (
 )
 from md24de._parser import parse_available_month, parse_consumption_html
 
-_BASE_URL = "https://legacy.messdienst24.de"
+_BASE_URL = "https://messdienst24.de"
 
 # Hard cap on how many bytes any single response may contain.
 # Protects against a slow-drip server holding the connection open indefinitely
@@ -178,40 +178,42 @@ class Md24deClient:
         return self._report
 
     def get_pdf(self) -> bytes:
-        """Download and return the raw PDF bytes for the available month.
+        """Render and return the raw PDF bytes for the available month.
 
-        Each call makes a fresh HTTP request to the portal.
+        The portal's current UVI page no longer offers a downloadable PDF, so this
+        method builds one locally — via :func:`~md24de.render_consumption_report_pdf`
+        — from the same parsed :class:`ConsumptionReport` returned by
+        :meth:`get_consumption_report`. No additional HTTP request is made; this
+        method's signature and return type are unchanged from prior versions, so
+        existing callers keep working without modification.
 
         Returns:
             Raw PDF binary content.
 
         Raises:
-            Md24deError: If the HTTP request fails or the response is not a valid PDF.
+            ParseError: If the consumption page cannot be fully parsed.
+            Md24deError: If the report has no history entries to determine the
+                covered period from.
+            PdfNotAvailableError: If the ``pdf`` optional extra (``reportlab``) is
+                not installed.
         """
+        # Imported lazily: reportlab (and its transitive Pillow dependency) is
+        # only needed for local PDF rendering, so avoid loading it for callers
+        # who only use Md24deClient for HTML parsing. check_reportlab_available()
+        # raises a friendly PdfNotAvailableError instead of a raw ImportError if
+        # the ``pdf`` extra isn't installed.
+        from md24de._pdf_check import check_reportlab_available
+
+        check_reportlab_available()
+        from md24de._pdf import render_consumption_report_pdf
 
         _log.debug(
-            "Downloading PDF (%04d-%02d)",
+            "Rendering PDF locally (%04d-%02d)",
             self._available_month.year,
             self._available_month.month,
         )
-        referer = f"{_BASE_URL}/?md={self._tenant}"
-        try:
-            content = self._traced_stream_request(
-                "GET",
-                f"{_BASE_URL}/",
-                params={"format": "pdf"},
-                headers={"Referer": referer},
-                label="PDF",
-            )
-        except httpx.HTTPStatusError as exc:
-            raise Md24deError(f"PDF download failed with HTTP {exc.response.status_code}") from exc
-        except httpx.HTTPError as exc:
-            raise Md24deError(f"PDF download failed: {exc}") from exc
-
-        if not content.startswith(b"%PDF-"):
-            raise ParseError("Portal response is not a valid PDF")
-
-        _log.debug("PDF downloaded (%d bytes)", len(content))
+        content = render_consumption_report_pdf(self.get_consumption_report())
+        _log.debug("PDF rendered (%d bytes)", len(content))
         return content
 
     # ------------------------------------------------------------------
@@ -219,15 +221,12 @@ class Md24deClient:
     # ------------------------------------------------------------------
 
     def _fetch_consumption_html(self) -> str:
-        """POST to the consumption endpoint and return the response HTML."""
+        """GET the UVI page and return the response HTML."""
         _log.debug("Fetching consumption HTML")
-        referer = f"{_BASE_URL}/?md={self._tenant}"
         try:
             raw = self._traced_stream_request(
-                "POST",
-                f"{_BASE_URL}/",
-                data={"action": "objverbmiet", "node": "content"},
-                headers={"Referer": referer},
+                "GET",
+                f"{_BASE_URL}/uvi",
                 label="Consumption page",
             )
         except httpx.HTTPStatusError as exc:

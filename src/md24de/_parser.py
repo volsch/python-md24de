@@ -42,6 +42,12 @@ GERMAN_MONTHS: dict[str, int] = {
 GERMAN_MONTH_NAMES: dict[int, str] = {number: name for name, number in GERMAN_MONTHS.items()}
 
 
+# The two headings under which the portal renders each meter's chart and
+# comparison text. Matched by exact heading text — deliberately not
+# positional, so an unrelated heading is never mistaken for a meter section.
+_HEATING_HEADING = "Heizung"
+_HOT_WATER_HEADING = "Warmwasser"
+
 # Substrings that uniquely identify each dataset by its visible label text.
 # These are the strings shown in the chart legend — far more stable than colors
 # or dataset order/position.
@@ -67,8 +73,20 @@ _AVERAGE_MARKER = "vergleichbare Haushalte"
 # Example: "Sie haben im Mai 2026 weniger als ..."
 _CURRENT_MONTH_RE = re.compile(r"Sie haben im (\w+) (\d{4})")
 
-# Regex for the "als im <Month> <Year> verbraucht" comparison sentence.
-_ALS_IM_RE = re.compile(r"als im (\w+) (\d{4}) verbraucht")
+# Regex matching one full comparison sentence, e.g.:
+# "Sie haben im Mai 2026 weniger als im April 2026 verbraucht."
+# Sentences are extracted this way — rather than relying on the surrounding
+# markup — because the portal renders them as plain text interspersed with
+# inline <span> elements (for color) and, depending on the page layout, may
+# join several sentences in a single container separated only by <br>. Both
+# forms concatenate to the same running text once tags are stripped, so a
+# content-based regex is more robust here than any DOM-structure assumption.
+_COMPARISON_SENTENCE_RE = re.compile(r"Sie haben im \w+ \d{4}.*?verbraucht\.")
+
+# Regex for the "als im <Month> <Year> verbraucht" / "wie im <Month> <Year>
+# verbraucht" comparison sentence ("als im" for weniger/mehr, "wie im" for
+# soviel/equal comparisons).
+_ALS_IM_RE = re.compile(r"(?:als|wie) im (\w+) (\d{4}) verbraucht")
 
 _log = logging.getLogger(__name__)
 
@@ -151,13 +169,13 @@ def parse_consumption_html(html: str) -> ConsumptionReport:
     heating: MeterReport | None = None
     hot_water: MeterReport | None = None
 
-    for h1 in soup.find_all("h1"):
-        result = _process_meter_h1(h1)
+    for heading in soup.find_all("h5"):
+        result = _process_meter_heading(heading)
         if result is None:
             continue
         is_heating, chart = result
 
-        meter = _build_meter_report(h1, chart)
+        meter = _build_meter_report(heading, chart)
         if is_heating:
             heating = meter
         else:
@@ -328,45 +346,50 @@ def _parse_german_month_year(label: str, canvas_id: str) -> tuple[int, int]:
 
 
 def _parse_comparisons(
-    div: Tag,
+    text: str,
     current_month: int,
     current_year: int,
 ) -> dict[str, Comparison]:
-    """Parse comparison sentences from the div that follows an h1 heading.
+    """Parse comparison sentences out of *text* (the container's plain text).
 
     Returns a dict with keys ``vs_average``, ``vs_previous_month``,
-    ``vs_previous_year`` mapped to :class:`Comparison` values.
+    ``vs_previous_year`` mapped to :class:`Comparison` values. Sentences are
+    located with :data:`_COMPARISON_SENTENCE_RE`, so the surrounding markup
+    (separate divs, ``<br>``-joined text, inline color ``<span>`` elements)
+    does not matter — only the sentence text itself.
     """
     results: dict[str, Comparison] = {}
 
-    for child in cast(list[Tag], div.find_all("div", recursive=False)):
-        text = child.get_text()
-        if not text.strip():
-            continue
-        direction = _parse_direction(text)
+    for match in _COMPARISON_SENTENCE_RE.finditer(text):
+        sentence = match.group(0)
+        direction = _parse_direction(sentence)
         if direction is None:
             continue
-        key = _classify_reference(text, current_month, current_year)
+        key = _classify_reference(sentence, current_month, current_year)
         if key is not None:
             results[key] = direction
 
     return results
 
 
-def _process_meter_h1(h1: Tag | object) -> tuple[bool, _ChartData] | None:
-    """Extract chart data from an h1 element, or return None if not a meter heading."""
-    if not isinstance(h1, Tag):
+def _process_meter_heading(heading: Tag | object) -> tuple[bool, _ChartData] | None:
+    """Extract chart data from a heading element, or None if not a meter heading."""
+    if not isinstance(heading, Tag):
         return None
-    container = h1.parent
+    heading_text = heading.get_text(strip=True)
+    if heading_text == _HEATING_HEADING:
+        is_heating = True
+    elif heading_text == _HOT_WATER_HEADING:
+        is_heating = False
+    else:
+        return None
+    container = heading.parent
     if not isinstance(container, Tag):
         return None
     canvas = container.find("canvas")
     if not isinstance(canvas, Tag):
         return None
     canvas_id = str(canvas.get("id", ""))
-    is_heating = _canvas_is_heating(canvas_id)
-    if is_heating is None:
-        return None
     chart_script = _find_chart_script_in(container)
     if chart_script is None or not chart_script.string:
         _log.log(
@@ -374,15 +397,6 @@ def _process_meter_h1(h1: Tag | object) -> tuple[bool, _ChartData] | None:
         )
         raise ParseError(f"Chart script not found for canvas '{canvas_id}'")
     return is_heating, _parse_chart_script(chart_script.string, canvas_id)
-
-
-def _canvas_is_heating(canvas_id: str) -> bool | None:
-    """Return True for heating canvas, False for hot-water, None for unknown."""
-    if canvas_id.endswith("_hz"):
-        return True
-    if canvas_id.endswith("_ww"):
-        return False
-    return None
 
 
 def _find_chart_script_in(container: Tag) -> Tag | None:
@@ -393,12 +407,28 @@ def _find_chart_script_in(container: Tag) -> Tag | None:
     return None
 
 
-def _build_meter_report(h1: Tag, chart: _ChartData) -> MeterReport:
-    """Build a :class:`MeterReport` from chart data and the adjacent comparison div."""
-    comparison_div = h1.find_next_sibling("div")
+def _find_comparison_text_in(container: Tag) -> str:
+    """Return the plain text of the child div holding the comparison sentences.
+
+    The comparison sentences live in a direct-child ``<div>`` of *container*
+    (a sibling of the chart's canvas/script) — the one whose text contains
+    "Sie haben im". Returns an empty string if no such div is found, letting
+    the caller treat that meter's comparisons as simply absent instead of
+    raising a hard error.
+    """
+    for child in cast(list[Tag], container.find_all("div", recursive=False)):
+        if "Sie haben im" in child.get_text():
+            return child.get_text()
+    return ""
+
+
+def _build_meter_report(heading: Tag, chart: _ChartData) -> MeterReport:
+    """Build a :class:`MeterReport` from chart data and the sibling comparison text."""
+    container = heading.parent
     comparisons: dict[str, Comparison] = {}
-    if isinstance(comparison_div, Tag):
-        comparisons = _parse_comparisons(comparison_div, chart.month, chart.year)
+    if isinstance(container, Tag):
+        comparison_text = _find_comparison_text_in(container)
+        comparisons = _parse_comparisons(comparison_text, chart.month, chart.year)
     return MeterReport(
         current_kwh=chart.readings[0].your_kwh,
         average_kwh=chart.readings[0].average_kwh,
@@ -428,8 +458,6 @@ def _classify_reference(
     """Return the comparison key for the sentence, or None if unrecognised."""
     if "vergleichbare Haushalte" in text:
         return "vs_average"
-    if "als im" not in text:
-        return None
     match = _ALS_IM_RE.search(text)
     if not match:
         return None
@@ -445,25 +473,33 @@ def _classify_reference(
 
 
 def _parse_object_info(soup: BeautifulSoup) -> ObjectInfo:
-    """Extract object number and address from the sidebar."""
+    """Extract the object number and address from the "ausgewähltes Objekt" field.
+
+    The portal renders this as a ``<span class="field-label">ausgewähltes
+    Objekt</span>`` followed by a sibling ``<div class="mt-1">`` containing the
+    object number (``<span class="field-value">``) and one or more address
+    lines (``<span class="text-gray-600">``), which are joined with ``", "``.
+    """
     object_number = ""
     address = ""
 
-    for name_div in cast(list[Tag], soup.find_all("div", class_="name")):
-        label = name_div.get_text(strip=True)
-        value_div = name_div.find_next_sibling("div", class_="value")
+    for label_span in cast(list[Tag], soup.find_all("span", class_="field-label")):
+        if "ausgewähltes Objekt" not in label_span.get_text():
+            continue
+        value_div = label_span.find_next_sibling("div", class_="mt-1")
         if not isinstance(value_div, Tag):
             continue
 
-        # Use ", " as separator for <br> elements within the address.
-        value = value_div.get_text(separator=", ", strip=True)
-        # Remove non-breaking spaces.
-        value = value.replace("\xa0", "").strip()
+        value_span = value_div.find("span", class_="field-value")
+        if isinstance(value_span, Tag):
+            object_number = value_span.get_text(strip=True)
 
-        if "Objektnummer" in label:
-            object_number = value
-        elif "Adresse" in label:
-            address = value
+        address_parts = [
+            span.get_text(strip=True)
+            for span in cast(list[Tag], value_div.find_all("span", class_="text-gray-600"))
+        ]
+        address = ", ".join(part for part in address_parts if part)
+        break
 
     return ObjectInfo(object_number=object_number, address=address)
 

@@ -16,6 +16,7 @@ from md24de import (
     dump_consumption_report,
     load_consumption_report,
 )
+from md24de._serialization import _to_json_value  # pyright: ignore[reportPrivateUsage]
 
 
 @pytest.fixture
@@ -71,6 +72,11 @@ class TestDumpConsumptionReport:
             {"year": 2026, "month": 5, "your_kwh": 0.0, "average_kwh": 200.0},
             {"year": 2026, "month": 4, "your_kwh": 150.0, "average_kwh": 300.0},
         ]
+
+    def test_unsupported_value_type_raises_parse_error(self) -> None:
+        """_to_json_value() must reject types it has no defined mapping for."""
+        with pytest.raises(ParseError, match="Cannot serialize value of type"):
+            _to_json_value(object())
 
     def test_omits_none_kwh_values(self) -> None:
         """A missing (None) kwh value is omitted from JSON, like other None fields."""

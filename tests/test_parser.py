@@ -10,9 +10,9 @@ from md24de._models import Comparison
 from md24de._parser import (  # pyright: ignore[reportPrivateUsage]
     GERMAN_MONTH_NAMES,
     GERMAN_MONTHS,
-    _canvas_is_heating,  # pyright: ignore[reportPrivateUsage]
     _classify_reference,  # pyright: ignore[reportPrivateUsage]
     _extract_chart_config,  # pyright: ignore[reportPrivateUsage]
+    _find_comparison_text_in,  # pyright: ignore[reportPrivateUsage]
     _is_previous_month,  # pyright: ignore[reportPrivateUsage]
     _is_same_month_previous_year,  # pyright: ignore[reportPrivateUsage]
     _parse_chart_script,  # pyright: ignore[reportPrivateUsage]
@@ -20,7 +20,7 @@ from md24de._parser import (  # pyright: ignore[reportPrivateUsage]
     _parse_direction,  # pyright: ignore[reportPrivateUsage]
     _parse_german_month_year,  # pyright: ignore[reportPrivateUsage]
     _parse_object_info,  # pyright: ignore[reportPrivateUsage]
-    _process_meter_h1,  # pyright: ignore[reportPrivateUsage]
+    _process_meter_heading,  # pyright: ignore[reportPrivateUsage]
     parse_available_month,
     parse_consumption_html,
 )
@@ -145,9 +145,11 @@ class TestParseErrors:
     def test_missing_chart_script_raises(self) -> None:
         html = """
         <html><body>
-          <h1>Heizung</h1>
-          <div></div>
-          <canvas id="chart_med_0001_hz"></canvas>
+          <div>
+            <h5>Heizung</h5>
+            <div></div>
+            <canvas id="100583bar"></canvas>
+          </div>
         </body></html>
         """
         with pytest.raises(ParseError):
@@ -201,7 +203,6 @@ class TestHelpers:
 
 def _chart_script(
     *,
-    canvas_id: str = "test_hz",
     labels: str = "['Mai 2026']",
     your_data: str = "[55.0]",
     avg_data: str = "[65.0]",
@@ -218,15 +219,15 @@ def _chart_script(
     )
 
 
-def _h1_html(canvas_suffix: str, script: str) -> str:
-    # The leading non-meter <h1> (no canvas) exercises the
+def _heading_html(heading_text: str, script: str) -> str:
+    # The leading non-meter <h5> (no canvas) exercises the
     # `if result is None: continue` branch in parse_consumption_html.
     return (
         "<html><body>"
-        "<div><h1>Page Header</h1></div>"
+        "<div><h5>Page Header</h5></div>"
         "<div>"
-        f"<h1>Meter Heading</h1>"
-        f"<canvas id='chart_med_0001_{canvas_suffix}'></canvas>"
+        f"<h5>{heading_text}</h5>"
+        "<canvas id='100583bar'></canvas>"
         f"<script>{script}</script>"
         "</div></body></html>"
     )
@@ -239,12 +240,12 @@ def _h1_html(canvas_suffix: str, script: str) -> str:
 
 class TestParseConsumptionHtmlErrors:
     def test_only_hot_water_raises_heating_not_found(self) -> None:
-        html = _h1_html("ww", _chart_script())
+        html = _heading_html("Warmwasser", _chart_script())
         with pytest.raises(ParseError, match="Heating meter data not found"):
             parse_consumption_html(html)
 
     def test_only_heating_raises_hot_water_not_found(self) -> None:
-        html = _h1_html("hz", _chart_script())
+        html = _heading_html("Heizung", _chart_script())
         with pytest.raises(ParseError, match="Hot-water meter data not found"):
             parse_consumption_html(html)
 
@@ -355,22 +356,6 @@ class TestParseGermanMonthYear:
 
 
 # ---------------------------------------------------------------------------
-# _canvas_is_heating
-# ---------------------------------------------------------------------------
-
-
-class TestCanvasIsHeating:
-    def test_hz_returns_true(self) -> None:
-        assert _canvas_is_heating("chart_med_0001_hz") is True
-
-    def test_ww_returns_false(self) -> None:
-        assert _canvas_is_heating("chart_med_0001_ww") is False
-
-    def test_unknown_suffix_returns_none(self) -> None:
-        assert _canvas_is_heating("chart_med_0001_xx") is None
-
-
-# ---------------------------------------------------------------------------
 # _parse_direction
 # ---------------------------------------------------------------------------
 
@@ -425,39 +410,54 @@ class TestClassifyReference:
 
 
 # ---------------------------------------------------------------------------
-# _process_meter_h1
+# _process_meter_heading
 # ---------------------------------------------------------------------------
 
 
-class TestProcessMeterH1:
+class TestProcessMeterHeading:
     def test_non_tag_returns_none(self) -> None:
-        assert _process_meter_h1("not a tag") is None
+        assert _process_meter_heading("not a tag") is None
 
-    def test_h1_without_canvas_returns_none(self) -> None:
-        soup = BeautifulSoup("<div><h1>heading</h1></div>", "lxml")
-        h1 = soup.find("h1")
-        assert _process_meter_h1(h1) is None
+    def test_unrelated_heading_returns_none(self) -> None:
+        soup = BeautifulSoup("<div><h5>Some other heading</h5></div>", "lxml")
+        heading = soup.find("h5")
+        assert _process_meter_heading(heading) is None
 
-    def test_h1_with_unknown_canvas_suffix_returns_none(self) -> None:
+    def test_heading_without_canvas_returns_none(self) -> None:
+        soup = BeautifulSoup("<div><h5>Heizung</h5></div>", "lxml")
+        heading = soup.find("h5")
+        assert _process_meter_heading(heading) is None
+
+    def test_heading_with_canvas_but_no_chart_script_raises(self) -> None:
         soup = BeautifulSoup(
-            "<div><h1>heading</h1><canvas id='chart_unknown_xx'></canvas></div>", "lxml"
-        )
-        h1 = soup.find("h1")
-        assert _process_meter_h1(h1) is None
-
-    def test_h1_with_canvas_but_no_chart_script_raises(self) -> None:
-        soup = BeautifulSoup(
-            "<div><h1>h</h1><canvas id='chart_med_0001_hz'></canvas><script>var x=1</script></div>",
+            "<div><h5>Heizung</h5><canvas id='100583bar'></canvas><script>var x=1</script></div>",
             "lxml",
         )
-        h1 = soup.find("h1")
+        heading = soup.find("h5")
         with pytest.raises(ParseError, match="Chart script not found"):
-            _process_meter_h1(h1)
+            _process_meter_heading(heading)
 
 
 # ---------------------------------------------------------------------------
-# _parse_object_info
+# _find_comparison_text_in
 # ---------------------------------------------------------------------------
+
+
+class TestFindComparisonTextIn:
+    def test_no_matching_div_returns_empty_string(self) -> None:
+        soup = BeautifulSoup("<div><div>unrelated text</div></div>", "lxml")
+        container = soup.find("div")
+        assert isinstance(container, Tag)
+        assert _find_comparison_text_in(container) == ""
+
+    def test_matching_div_returns_its_text(self) -> None:
+        soup = BeautifulSoup(
+            "<div><div>Sie haben im Mai 2026 weniger verbraucht.</div></div>", "lxml"
+        )
+        container = soup.find("div")
+        assert isinstance(container, Tag)
+        assert "Sie haben im Mai 2026" in _find_comparison_text_in(container)
+
 
 # ---------------------------------------------------------------------------
 # _parse_comparisons
@@ -465,53 +465,61 @@ class TestProcessMeterH1:
 
 
 class TestParseComparisons:
-    def test_empty_text_div_is_skipped(self) -> None:
-        soup = BeautifulSoup("<div><div>   </div></div>", "lxml")
-        div = soup.find("div")
-        assert isinstance(div, Tag)
-        result = _parse_comparisons(div, 5, 2026)
-        assert result == {}
+    def test_empty_text_returns_empty_dict(self) -> None:
+        assert _parse_comparisons("   ", 5, 2026) == {}
 
-    def test_no_direction_keyword_is_skipped(self) -> None:
-        soup = BeautifulSoup("<div><div>Keine Richtung hier</div></div>", "lxml")
-        div = soup.find("div")
-        assert isinstance(div, Tag)
-        result = _parse_comparisons(div, 5, 2026)
-        assert result == {}
+    def test_no_sentence_match_returns_empty_dict(self) -> None:
+        assert _parse_comparisons("Keine Richtung hier", 5, 2026) == {}
 
     def test_vs_average_found(self) -> None:
-        soup = BeautifulSoup(
-            "<div><div>Sie haben weniger als vergleichbare Haushalte</div></div>", "lxml"
-        )
-        div = soup.find("div")
-        assert isinstance(div, Tag)
-        result = _parse_comparisons(div, 5, 2026)
+        text = "Sie haben im Mai 2026 weniger als vergleichbare Haushalte verbraucht."
+        result = _parse_comparisons(text, 5, 2026)
         assert result.get("vs_average") is Comparison.LESS
+
+    def test_multiple_sentences_joined_without_separator(self) -> None:
+        # Mirrors how the portal concatenates <br>-joined sentences with no
+        # whitespace between them once inline <span> tags are stripped.
+        text = (
+            "Sie haben im Mai 2026 weniger als vergleichbare Haushalte verbraucht."
+            "Sie haben im Mai 2026 mehr als im April 2026 verbraucht."
+            "Sie haben im Mai 2026 soviel wie im Mai 2025 verbraucht."
+        )
+        result = _parse_comparisons(text, 5, 2026)
+        assert result["vs_average"] is Comparison.LESS
+        assert result["vs_previous_month"] is Comparison.MORE
+        assert result["vs_previous_year"] is Comparison.EQUAL
 
 
 class TestParseObjectInfo:
-    def test_name_div_without_value_sibling_is_skipped(self) -> None:
+    def test_label_without_value_sibling_is_skipped(self) -> None:
         soup = BeautifulSoup(
-            "<html><body><div class='name'>Objektnummer</div></body></html>", "lxml"
+            "<html><body><span class='field-label'>ausgewähltes Objekt</span></body></html>",
+            "lxml",
         )
         info = _parse_object_info(soup)
         assert info.object_number == ""
+        assert info.address == ""
 
     def test_both_fields_populated(self) -> None:
         html = (
             "<html><body>"
-            "<div class='name'>Objektnummer</div><div class='value'>123-456</div>"
-            "<div class='name'>Adresse</div><div class='value'>Musterstraße 1</div>"
+            "<span class='field-label'>ausgewähltes Objekt</span>"
+            "<div class='mt-1'>"
+            "<span class='field-value'>123-456</span><br>"
+            "<span class='text-gray-600'>Musterstraße 1</span><br>"
+            "<span class='text-gray-600'>12345 Musterstadt</span>"
+            "</div>"
             "</body></html>"
         )
         info = _parse_object_info(BeautifulSoup(html, "lxml"))
         assert info.object_number == "123-456"
-        assert info.address == "Musterstraße 1"
+        assert info.address == "Musterstraße 1, 12345 Musterstadt"
 
     def test_unrecognised_label_is_ignored(self) -> None:
         html = (
             "<html><body>"
-            "<div class='name'>Sonstige Info</div><div class='value'>Wert</div>"
+            "<span class='field-label'>Sonstige Info</span>"
+            "<div class='mt-1'><span class='field-value'>Wert</span></div>"
             "</body></html>"
         )
         info = _parse_object_info(BeautifulSoup(html, "lxml"))

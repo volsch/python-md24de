@@ -21,6 +21,7 @@ from md24de import (
     MeterReading,
     MeterReport,
     ObjectInfo,
+    PdfNotAvailableError,
 )
 
 
@@ -108,47 +109,42 @@ class TestGetConsumptionReport:
         assert report.hot_water.current_kwh == pytest.approx(55.0)
         assert report.hot_water.vs_previous_month is Comparison.LESS
 
+    def test_second_call_returns_cached_report(self, client: Md24deClient) -> None:
+        """A second call must not re-parse — it returns the same cached object."""
+        first = client.get_consumption_report()
+        second = client.get_consumption_report()
+        assert first is second
+
 
 class TestGetPdf:
-    def _make_send_mock(self, content: bytes, status_code: int = 200) -> MagicMock:
-        """Return a mock response as returned by ``httpx.Client.send(..., stream=True)``."""
-        mock_resp: MagicMock = MagicMock()
-        mock_resp.raise_for_status = MagicMock()
-        mock_resp.iter_bytes.return_value = iter([content])
-        mock_resp.headers = httpx.Headers({})
-        mock_resp.extensions = {}
-        mock_resp.close = MagicMock()
-        if status_code != 200:
-            mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
-                "", request=MagicMock(), response=MagicMock(status_code=status_code)
-            )
-        return mock_resp
-
     def test_returns_pdf_bytes(self, client: Md24deClient) -> None:
-        mock_resp = self._make_send_mock(b"%PDF-1.4 fake")
-        with patch.object(client._http, "send", return_value=mock_resp):  # pyright: ignore[reportPrivateUsage]
-            pdf = client.get_pdf()
+        pdf = client.get_pdf()
         assert isinstance(pdf, bytes)
         assert pdf.startswith(b"%PDF-")
 
-    def test_raises_for_non_pdf_response(self, client: Md24deClient) -> None:
-        from md24de import ParseError  # noqa: PLC0415
-
-        mock_resp = self._make_send_mock(b"<html>Not a PDF</html>")
-        with (
-            patch.object(client._http, "send", return_value=mock_resp),  # pyright: ignore[reportPrivateUsage]
-            pytest.raises(ParseError),
-        ):
+    def test_renders_locally_without_http_request(
+        self, client: Md24deClient, sample_report: ConsumptionReport
+    ) -> None:
+        """get_pdf() must not touch the network — it renders the cached report locally."""
+        with patch.object(client._http, "send") as mock_send:  # pyright: ignore[reportPrivateUsage]
             client.get_pdf()
+        mock_send.assert_not_called()
 
-    def test_raises_when_pdf_exceeds_size_limit(self, client: Md24deClient) -> None:
-        from md24de._client import _MAX_RESPONSE_BYTES  # pyright: ignore[reportPrivateUsage]
+    def test_uses_render_consumption_report_pdf_with_the_report(
+        self, client: Md24deClient, sample_report: ConsumptionReport
+    ) -> None:
+        with patch("md24de._pdf.render_consumption_report_pdf") as mock_render:
+            mock_render.return_value = b"%PDF-fake"
+            pdf = client.get_pdf()
+        mock_render.assert_called_once_with(sample_report)
+        assert pdf == b"%PDF-fake"
 
-        oversized = b"%PDF-" + b"x" * _MAX_RESPONSE_BYTES
-        mock_resp = self._make_send_mock(oversized)
+    def test_raises_pdf_not_available_error_when_reportlab_missing(
+        self, client: Md24deClient
+    ) -> None:
         with (
-            patch.object(client._http, "send", return_value=mock_resp),  # pyright: ignore[reportPrivateUsage]
-            pytest.raises(Md24deError, match="2 MB limit"),
+            patch("md24de._pdf_check._is_reportlab_available", return_value=False),
+            pytest.raises(PdfNotAvailableError),
         ):
             client.get_pdf()
 
@@ -184,7 +180,7 @@ class TestContextManager:
 
 
 class TestHttpErrorPaths:
-    """Test HTTP error handling in _fetch_consumption_html and get_pdf using MockTransport."""
+    """Test HTTP error handling in _fetch_consumption_html using MockTransport."""
 
     def _make_client_with_transport(
         self, transport: httpx.MockTransport, sample_report: ConsumptionReport
@@ -201,7 +197,7 @@ class TestHttpErrorPaths:
             c = Md24deClient(tenant="xy", username="u", password="p")  # noqa: S106  # NOSONAR
         # Replace the real HTTP client with one backed by the test transport.
         c._http.close()  # pyright: ignore[reportPrivateUsage]
-        c._http = httpx.Client(transport=transport, base_url="https://legacy.messdienst24.de")  # pyright: ignore[reportPrivateUsage]
+        c._http = httpx.Client(transport=transport, base_url="https://messdienst24.de")  # pyright: ignore[reportPrivateUsage]
         return c
 
     # --- _fetch_consumption_html ------------------------------------------
@@ -226,39 +222,19 @@ class TestHttpErrorPaths:
         with pytest.raises(Md24deError, match="Consumption page request failed"):
             c._fetch_consumption_html()  # pyright: ignore[reportPrivateUsage]
 
-    # --- get_pdf -------------------------------------------------------------
+    def test_fetch_html_requests_uvi_endpoint(self, sample_report: ConsumptionReport) -> None:
+        captured: list[httpx.Request] = []
 
-    def test_get_pdf_http_status_error_raises_md24deerror(
-        self, sample_report: ConsumptionReport
-    ) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(404, request=request)
+            captured.append(request)
+            return httpx.Response(200, content=b"<html>ok</html>", request=request)
 
         c = self._make_client_with_transport(httpx.MockTransport(handler), sample_report)
-        with pytest.raises(Md24deError, match="PDF download failed with HTTP 404"):
-            c.get_pdf()
+        c._fetch_consumption_html()  # pyright: ignore[reportPrivateUsage]
 
-    def test_get_pdf_network_error_raises_md24deerror(
-        self, sample_report: ConsumptionReport
-    ) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            raise httpx.ConnectError("connection refused")
-
-        c = self._make_client_with_transport(httpx.MockTransport(handler), sample_report)
-        with pytest.raises(Md24deError, match="PDF download failed"):
-            c.get_pdf()
-
-    def test_get_pdf_non_pdf_content_raises_parse_error(
-        self, sample_report: ConsumptionReport
-    ) -> None:
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, content=b"<html>not a pdf</html>", request=request)
-
-        from md24de._exceptions import ParseError
-
-        c = self._make_client_with_transport(httpx.MockTransport(handler), sample_report)
-        with pytest.raises(ParseError, match="not a valid PDF"):
-            c.get_pdf()
+        assert len(captured) == 1
+        assert captured[0].method == "GET"
+        assert captured[0].url.path == "/uvi"
 
     def test_init_closes_http_on_login_error(self) -> None:
         """If __init__ fails, the internal HTTP client is closed."""
@@ -287,20 +263,8 @@ class TestResponseSizeLimit:
         ):
             c = Md24deClient(tenant="xy", username="u", password="p")  # noqa: S106  # NOSONAR
         c._http.close()  # pyright: ignore[reportPrivateUsage]
-        c._http = httpx.Client(transport=transport, base_url="https://legacy.messdienst24.de")  # pyright: ignore[reportPrivateUsage]
+        c._http = httpx.Client(transport=transport, base_url="https://messdienst24.de")  # pyright: ignore[reportPrivateUsage]
         return c
-
-    def test_pdf_over_limit_raises(self, sample_report: ConsumptionReport) -> None:
-        from md24de._client import _MAX_RESPONSE_BYTES  # pyright: ignore[reportPrivateUsage]
-
-        oversized = b"%PDF-" + b"x" * _MAX_RESPONSE_BYTES
-
-        def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, content=oversized, request=request)
-
-        c = self._make_client_with_transport(httpx.MockTransport(handler), sample_report)
-        with pytest.raises(Md24deError, match="2 MB limit"):
-            c.get_pdf()
 
     def test_html_over_limit_raises(self, sample_report: ConsumptionReport) -> None:
         from md24de._client import _MAX_RESPONSE_BYTES  # pyright: ignore[reportPrivateUsage]
@@ -326,7 +290,7 @@ class _TraceRecorder:
 
 
 class TestHttpTraceCallback:
-    """Verify http_trace_callback is invoked correctly for get_pdf/_fetch_consumption_html."""
+    """Verify http_trace_callback is invoked correctly for _fetch_consumption_html."""
 
     def _make_client_with_transport(
         self,
@@ -349,18 +313,18 @@ class TestHttpTraceCallback:
                 options=ClientOptions(http_trace_callback=http_trace_callback),
             )
         c._http.close()  # pyright: ignore[reportPrivateUsage]
-        c._http = httpx.Client(transport=transport, base_url="https://legacy.messdienst24.de")  # pyright: ignore[reportPrivateUsage]
+        c._http = httpx.Client(transport=transport, base_url="https://messdienst24.de")  # pyright: ignore[reportPrivateUsage]
         return c
 
     def test_callback_called_on_success(self, sample_report: ConsumptionReport) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, content=b"%PDF-1.4 fake", request=request)
+            return httpx.Response(200, content=b"<html>ok</html>", request=request)
 
         recorder = _TraceRecorder()
         c = self._make_client_with_transport(
             httpx.MockTransport(handler), sample_report, recorder
         )
-        c.get_pdf()
+        c._fetch_consumption_html()  # pyright: ignore[reportPrivateUsage]
         assert len(recorder.calls) == 1
         req_trace, resp_trace = recorder.calls[0]
         assert req_trace.method == "GET"
@@ -376,7 +340,7 @@ class TestHttpTraceCallback:
             httpx.MockTransport(handler), sample_report, recorder
         )
         with pytest.raises(Md24deError):
-            c.get_pdf()
+            c._fetch_consumption_html()  # pyright: ignore[reportPrivateUsage]
         assert len(recorder.calls) == 1
         _, resp_trace = recorder.calls[0]
         assert resp_trace is not None
@@ -391,7 +355,7 @@ class TestHttpTraceCallback:
             httpx.MockTransport(handler), sample_report, recorder
         )
         with pytest.raises(Md24deError):
-            c.get_pdf()
+            c._fetch_consumption_html()  # pyright: ignore[reportPrivateUsage]
         assert len(recorder.calls) == 1
         req_trace, resp_trace = recorder.calls[0]
         assert req_trace.method == "GET"
@@ -399,11 +363,11 @@ class TestHttpTraceCallback:
 
     def test_callback_not_called_when_none(self, sample_report: ConsumptionReport) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, content=b"%PDF-1.4 fake", request=request)
+            return httpx.Response(200, content=b"<html>ok</html>", request=request)
 
         c = self._make_client_with_transport(httpx.MockTransport(handler), sample_report, None)
         # Should not raise even though no callback is configured.
-        c.get_pdf()
+        c._fetch_consumption_html()  # pyright: ignore[reportPrivateUsage]
 
     def test_callback_never_called_for_login(self, sample_report: ConsumptionReport) -> None:
         """login()/logout() are patched out entirely in the fixture and never touch

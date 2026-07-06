@@ -30,6 +30,10 @@ Session-independent helpers -- operate on an already-parsed
 :data:`GERMAN_MONTH_NAMES` maps month numbers (1-12) to their German names
 (e.g. ``{5: "Mai"}``), for callers that need to render a German month name
 without depending on the library's internal parsing logic.
+
+:func:`get_uvi_disclosure_note` returns the mandatory § 6a Abs. 2 HeizkostenV
+disclosure text embedded in the rendered PDF, for callers that need the note
+on its own (e.g. to show it in a UI) without rendering a full PDF.
 """
 
 import logging
@@ -59,6 +63,7 @@ from md24de._models import (  # noqa: E402
     MeterReport,
     ObjectInfo,
 )
+from md24de._notices import get_uvi_disclosure_note  # noqa: E402
 from md24de._parser import GERMAN_MONTH_NAMES  # noqa: E402
 from md24de._serialization import (  # noqa: E402
     dump_consumption_report,
@@ -113,6 +118,7 @@ __all__ = [
     "dump_consumption_report",
     "load_consumption_report",
     "render_consumption_report_pdf",
+    "get_uvi_disclosure_note",
     # Exceptions
     "Md24deError",
     "LoginError",

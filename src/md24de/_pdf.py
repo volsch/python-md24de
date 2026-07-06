@@ -23,6 +23,7 @@ from reportlab.platypus import (
 
 from md24de._exceptions import Md24deError
 from md24de._models import Comparison, ConsumptionReport, MeterReading, MeterReport
+from md24de._notices import get_uvi_disclosure_note
 from md24de._parser import GERMAN_MONTH_NAMES
 
 _log = logging.getLogger(__name__)
@@ -54,19 +55,6 @@ _COMPARISON_SYMBOLS: dict[Comparison, str] = {
 
 # Condensed version of the mandatory § 6a Abs. 2 HeizkostenV disclosure text.
 _NOTE_TITLE = "Hinweis:"
-_NOTE_TEXT = (
-    'Die Heizungs- und Warmwasserverbräuche wurden mit den zum Ablesezeitpunkt empfangenen '
-    "Werten berechnet und gemäß § 6a Absatz 2 Heizkostenverordnung in kWh angegeben. Diese "
-    'unterjährige Verbrauchsinformation ("UVI") deckt ausschließlich die monatlichen '
-    "Pflichtangaben nach § 6a Absatz 2 HeizkostenV ab (Verbrauch des Vormonats, Vergleich mit "
-    "dem Vormonat und dem entsprechenden Monat des Vorjahres sowie Vergleich mit einem "
-    "durchschnittlichen Nutzer). Sie ersetzt keine Abrechnung und ist für die monatliche "
-    "Abrechnung nicht geeignet; auf ihrer Grundlage können Heizkostenvorschüsse weder angehoben "
-    "noch gekürzt werden. Die Jahresendabrechnung kann aufgrund von Umlageschlüsseln und "
-    "Korrekturwerten von den hier dargestellten Werten abweichen; ihre formelle und materielle "
-    "Wirksamkeit bleibt von eventuellen Fehlern in der UVI unberührt. Die Aufsummierung der UVI "
-    "über das Jahr ergibt weder den Jahresverbrauch noch einen Hinweis auf die Kostenentwicklung."
-)
 
 
 
@@ -507,5 +495,5 @@ def _build_note() -> list[Flowable]:
         Spacer(1, 16.0),
         Paragraph(_NOTE_TITLE, title_style),
         Spacer(1, 6.0),
-        Paragraph(_NOTE_TEXT, note_style),
+        Paragraph(get_uvi_disclosure_note(), note_style),
     ]

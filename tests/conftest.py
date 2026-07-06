@@ -11,5 +11,5 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 @pytest.fixture
 def consumption_html() -> str:
-    """Raw HTML from the portal's consumption endpoint (anonymized/synthetic sample data)."""
+    """Raw HTML from the portal's ``/uvi`` page (anonymized/synthetic sample data)."""
     return (FIXTURES_DIR / "consumption.html").read_text(encoding="utf-8")
