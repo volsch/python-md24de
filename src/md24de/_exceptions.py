@@ -21,3 +21,12 @@ class ParseError(Md24deError):
     This typically indicates that the portal's HTML structure has changed
     and the library needs to be updated.
     """
+
+
+class PdfNotAvailableError(Md24deError):
+    """Raised when PDF rendering is requested but reportlab is not installed.
+
+    Install the ``pdf`` extra to enable PDF rendering::
+
+        pip install python-md24de[pdf]
+    """

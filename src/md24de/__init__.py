@@ -42,6 +42,7 @@ from md24de._exceptions import (  # noqa: E402
     LoginError,
     Md24deError,
     ParseError,
+    PdfNotAvailableError,
 )
 from md24de._http_trace import (  # noqa: E402
     FileHttpTraceLogger,
@@ -113,4 +114,5 @@ __all__ = [
     "Md24deError",
     "LoginError",
     "ParseError",
+    "PdfNotAvailableError",
 ]

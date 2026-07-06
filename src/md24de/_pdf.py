@@ -11,17 +11,24 @@ from md24de._pdf_check import check_reportlab_available
 # Check at module import time that reportlab is available
 check_reportlab_available()
 
-from reportlab.graphics.charts.barcharts import VerticalBarChart
-from reportlab.graphics.shapes import Drawing
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_JUSTIFY
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.platypus import Flowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.graphics.charts.barcharts import VerticalBarChart  # noqa: E402
+from reportlab.graphics.shapes import Drawing  # noqa: E402
+from reportlab.lib import colors  # noqa: E402
+from reportlab.lib.enums import TA_JUSTIFY  # noqa: E402
+from reportlab.lib.pagesizes import A4  # noqa: E402
+from reportlab.lib.styles import ParagraphStyle  # noqa: E402
+from reportlab.platypus import (  # noqa: E402
+    Flowable,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
-from md24de._exceptions import Md24deError
-from md24de._models import Comparison, ConsumptionReport, MeterReading, MeterReport
-from md24de._parser import GERMAN_MONTH_NAMES
+from md24de._exceptions import Md24deError  # noqa: E402
+from md24de._models import Comparison, ConsumptionReport, MeterReading, MeterReport  # noqa: E402
+from md24de._parser import GERMAN_MONTH_NAMES  # noqa: E402
 
 _log = logging.getLogger(__name__)
 
