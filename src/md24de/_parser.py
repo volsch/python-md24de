@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -471,6 +472,25 @@ def _build_meter_report(heading: Tag, chart: _ChartData) -> MeterReport:
         "vs_previous_year" in comparisons,
     )
 
+    _check_comparison_direction(
+        f"{meter_name} vs_average",
+        comparisons.get("vs_average"),
+        current.your_kwh,
+        current.average_kwh,
+    )
+    _check_comparison_direction(
+        f"{meter_name} vs_previous_month",
+        comparisons.get("vs_previous_month"),
+        current.your_kwh,
+        previous_month_reading.your_kwh if previous_month_reading is not None else None,
+    )
+    _check_comparison_direction(
+        f"{meter_name} vs_previous_year",
+        comparisons.get("vs_previous_year"),
+        current.your_kwh,
+        previous_year_reading.your_kwh if previous_year_reading is not None else None,
+    )
+
     return MeterReport(
         current_kwh=current.your_kwh,
         average_kwh=current.average_kwh,
@@ -520,6 +540,51 @@ def _check_comparison_consistency(
         raise ParseError(f"{label}: kWh value ({kwh}) present but comparison sentence is missing")
     if sentence_present and kwh is None:
         raise ParseError(f"{label}: comparison sentence present but kWh value is missing")
+
+
+def _check_comparison_direction(
+    label: str,
+    comparison: Comparison | None,
+    current_kwh: float | None,
+    reference_kwh: float | None,
+) -> None:
+    """Raise :class:`ParseError` if *comparison* contradicts the actual kWh values.
+
+    E.g. a "weniger" (LESS) sentence requires ``current_kwh < reference_kwh`` —
+    if the portal's own numbers disagree with its own wording, that indicates
+    either a parsing bug or an unannounced portal change, so we fail fast
+    rather than silently return a self-contradictory report.
+    """
+    if comparison is None:
+        return
+    # _check_comparison_consistency (called before this for the same pair)
+    # already guarantees reference_kwh is present whenever comparison is not
+    # None. current_kwh is checked independently here because nothing else
+    # ties it to comparison presence: the sentence describes *this* month's
+    # consumption relative to the reference, so a missing current_kwh with a
+    # present comparison is just as inconsistent as a missing reference_kwh.
+    if current_kwh is None or reference_kwh is None:
+        raise ParseError(
+            f"{label}: comparison sentence ({comparison.value}) present but current "
+            f"kWh ({current_kwh}) or reference kWh ({reference_kwh}) is missing"
+        )
+    if comparison is Comparison.LESS and not current_kwh < reference_kwh:
+        raise ParseError(
+            f"{label}: sentence says 'weniger' (less) but current kWh ({current_kwh}) "
+            f"is not less than reference kWh ({reference_kwh})"
+        )
+    if comparison is Comparison.MORE and not current_kwh > reference_kwh:
+        raise ParseError(
+            f"{label}: sentence says 'mehr' (more) but current kWh ({current_kwh}) "
+            f"is not greater than reference kWh ({reference_kwh})"
+        )
+    if comparison is Comparison.EQUAL and not math.isclose(
+        current_kwh, reference_kwh, rel_tol=1e-9, abs_tol=1e-9
+    ):
+        raise ParseError(
+            f"{label}: sentence says 'soviel' (equal) but current kWh ({current_kwh}) "
+            f"differs from reference kWh ({reference_kwh})"
+        )
 
 
 def _parse_direction(text: str) -> Comparison | None:

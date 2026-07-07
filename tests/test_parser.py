@@ -11,6 +11,7 @@ from md24de._parser import (  # pyright: ignore[reportPrivateUsage]
     GERMAN_MONTH_NAMES,
     GERMAN_MONTHS,
     _check_comparison_consistency,  # pyright: ignore[reportPrivateUsage]
+    _check_comparison_direction,  # pyright: ignore[reportPrivateUsage]
     _classify_reference,  # pyright: ignore[reportPrivateUsage]
     _extract_chart_config,  # pyright: ignore[reportPrivateUsage]
     _find_comparison_text_in,  # pyright: ignore[reportPrivateUsage]
@@ -312,6 +313,15 @@ class TestBuildMeterReportConsistency:
         assert report.heating.vs_average is Comparison.LESS
         assert report.hot_water.vs_average is Comparison.LESS
 
+    def test_sentence_direction_contradicting_values_raises(self) -> None:
+        # _chart_script() default is your_data=55.0 < avg_data=65.0, so a
+        # "mehr" (more) sentence contradicts the actual numbers and must fail.
+        html = _both_meters_html(
+            "<div>Sie haben im Mai 2026 mehr als vergleichbare Haushalte verbraucht.</div>"
+        )
+        with pytest.raises(ParseError, match="vs_average.*says 'mehr'"):
+            parse_consumption_html(html)
+
 
 # ---------------------------------------------------------------------------
 # _check_comparison_consistency
@@ -340,6 +350,50 @@ class TestCheckComparisonConsistency:
 
     def test_zero_kwh_and_sentence_present_is_consistent(self) -> None:
         _check_comparison_consistency("label", 0.0, sentence_present=True)
+
+
+# ---------------------------------------------------------------------------
+# _check_comparison_direction
+# ---------------------------------------------------------------------------
+
+
+class TestCheckComparisonDirection:
+    def test_no_comparison_is_always_consistent(self) -> None:
+        _check_comparison_direction("label", None, None, None)
+        _check_comparison_direction("label", None, 10.0, 20.0)
+
+    def test_less_with_lower_current_is_consistent(self) -> None:
+        _check_comparison_direction("label", Comparison.LESS, 10.0, 20.0)
+
+    def test_less_with_equal_or_higher_current_raises(self) -> None:
+        with pytest.raises(ParseError, match="says 'weniger'"):
+            _check_comparison_direction("label", Comparison.LESS, 20.0, 20.0)
+        with pytest.raises(ParseError, match="says 'weniger'"):
+            _check_comparison_direction("label", Comparison.LESS, 30.0, 20.0)
+
+    def test_more_with_higher_current_is_consistent(self) -> None:
+        _check_comparison_direction("label", Comparison.MORE, 30.0, 20.0)
+
+    def test_more_with_equal_or_lower_current_raises(self) -> None:
+        with pytest.raises(ParseError, match="says 'mehr'"):
+            _check_comparison_direction("label", Comparison.MORE, 20.0, 20.0)
+        with pytest.raises(ParseError, match="says 'mehr'"):
+            _check_comparison_direction("label", Comparison.MORE, 10.0, 20.0)
+
+    def test_equal_with_matching_current_is_consistent(self) -> None:
+        _check_comparison_direction("label", Comparison.EQUAL, 20.0, 20.0)
+
+    def test_equal_with_differing_current_raises(self) -> None:
+        with pytest.raises(ParseError, match="says 'soviel'"):
+            _check_comparison_direction("label", Comparison.EQUAL, 10.0, 20.0)
+
+    def test_comparison_present_but_current_kwh_missing_raises(self) -> None:
+        with pytest.raises(ParseError, match="current kWh .* or reference kWh .* is missing"):
+            _check_comparison_direction("label", Comparison.LESS, None, 20.0)
+
+    def test_comparison_present_but_reference_kwh_missing_raises(self) -> None:
+        with pytest.raises(ParseError, match="current kWh .* or reference kWh .* is missing"):
+            _check_comparison_direction("label", Comparison.LESS, 10.0, None)
 
 
 # ---------------------------------------------------------------------------
