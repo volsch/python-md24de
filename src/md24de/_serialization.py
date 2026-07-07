@@ -65,7 +65,7 @@ def load_consumption_report(data: str) -> ConsumptionReport:
             heating=_meter_report_from_dict(cast(dict[str, Any], obj["heating"])),
             hot_water=_meter_report_from_dict(cast(dict[str, Any], obj["hot_water"])),
         )
-    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+    except (KeyError, TypeError, ValueError) as exc:
         raise ParseError(f"Invalid consumption report JSON: {exc}") from exc
     _log.debug("Parsed consumption report from JSON")
     return report
