@@ -61,7 +61,7 @@ def load_consumption_report(data: str) -> ConsumptionReport:
             raise ParseError("Consumption report JSON must be an object")  # noqa: TRY301
         obj = cast(dict[str, Any], parsed)
         report = ConsumptionReport(
-            object_info=ObjectInfo(**cast(dict[str, str], obj["object_info"])),
+            object_info=_object_info_from_dict(cast(dict[str, Any], obj["object_info"])),
             heating=_meter_report_from_dict(cast(dict[str, Any], obj["heating"])),
             hot_water=_meter_report_from_dict(cast(dict[str, Any], obj["hot_water"])),
         )
@@ -91,6 +91,15 @@ def _to_json_value(value: object) -> JSONValue:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     raise ParseError(f"Cannot serialize value of type {type(value).__name__} to JSON")
+
+
+def _object_info_from_dict(obj: dict[str, Any]) -> ObjectInfo:
+    return ObjectInfo(
+        object_number=obj["object_number"],
+        address=obj["address"],
+        unit_id=obj.get("unit_id", ""),
+        occupant_name=obj.get("occupant_name", ""),
+    )
 
 
 def _meter_report_from_dict(obj: dict[str, Any]) -> MeterReport:

@@ -83,6 +83,15 @@ class ObjectInfo:
     address: str
     """Street address of the metered object."""
 
+    unit_id: str
+    """Identifier of the metered flat/unit as shown by the portal (e.g. ``"0001-001"``),
+    taken verbatim from the tab's fragment identifier. The internal structure of this
+    identifier is not part of the public contract and may vary by building."""
+
+    occupant_name: str
+    """Name of the current tenant or owner of the unit (e.g. ``"Max Mustermann"``),
+    as shown next to the ``"Mieter:"`` label."""
+
 
 @dataclass(frozen=True)
 class HttpRequestTrace:

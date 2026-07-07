@@ -10,6 +10,7 @@ from md24de._models import Comparison
 from md24de._parser import (  # pyright: ignore[reportPrivateUsage]
     GERMAN_MONTH_NAMES,
     GERMAN_MONTHS,
+    _check_comparison_consistency,  # pyright: ignore[reportPrivateUsage]
     _classify_reference,  # pyright: ignore[reportPrivateUsage]
     _extract_chart_config,  # pyright: ignore[reportPrivateUsage]
     _find_comparison_text_in,  # pyright: ignore[reportPrivateUsage]
@@ -48,6 +49,8 @@ class TestParseConsumptionHtml:
         report = parse_consumption_html(consumption_html)
         assert report.object_info.object_number == "000-000000"
         assert report.object_info.address == "Musterstraße 1, 12345 Musterstadt"
+        assert report.object_info.unit_id == "0001-001"
+        assert report.object_info.occupant_name == "Max Mustermann"
 
     # ------------------------------------------------------------------
     # Heating
@@ -65,11 +68,9 @@ class TestParseConsumptionHtml:
         report = parse_consumption_html(consumption_html)
         assert report.heating.vs_average is Comparison.LESS
 
-    def test_heating_vs_previous_month_is_none(self, consumption_html: str) -> None:
-        # The fixture has no "als im April 2026" sentence for heating —
-        # the portal omits the previous-month comparison in this case.
+    def test_heating_vs_previous_month(self, consumption_html: str) -> None:
         report = parse_consumption_html(consumption_html)
-        assert report.heating.vs_previous_month is None
+        assert report.heating.vs_previous_month is Comparison.LESS
 
     def test_heating_vs_previous_year(self, consumption_html: str) -> None:
         report = parse_consumption_html(consumption_html)
@@ -222,6 +223,9 @@ def _chart_script(
 def _heading_html(heading_text: str, script: str) -> str:
     # The leading non-meter <h5> (no canvas) exercises the
     # `if result is None: continue` branch in parse_consumption_html.
+    # The comparison sentence matches the default `_chart_script()` average
+    # kWh value so this fixture stays consistent (see `_check_comparison_consistency`)
+    # and tests unrelated to that check aren't tripped up by it.
     return (
         "<html><body>"
         "<div><h5>Page Header</h5></div>"
@@ -229,6 +233,7 @@ def _heading_html(heading_text: str, script: str) -> str:
         f"<h5>{heading_text}</h5>"
         "<canvas id='100583bar'></canvas>"
         f"<script>{script}</script>"
+        "<div>Sie haben im Mai 2026 weniger als vergleichbare Haushalte verbraucht.</div>"
         "</div></body></html>"
     )
 
@@ -248,6 +253,93 @@ class TestParseConsumptionHtmlErrors:
         html = _heading_html("Heizung", _chart_script())
         with pytest.raises(ParseError, match="Hot-water meter data not found"):
             parse_consumption_html(html)
+
+
+# ---------------------------------------------------------------------------
+# parse_consumption_html — kWh / comparison-sentence consistency
+# ---------------------------------------------------------------------------
+
+
+def _both_meters_html(comparison_div: str, heating_script: str | None = None) -> str:
+    """Build minimal consumption HTML for both meters using the given comparison div."""
+    script = _chart_script()
+    return (
+        "<html><body>"
+        "<li class='tab col s6 m3'><a href='#0001-001'>0001-001&nbsp;&nbsp;Max Mustermann</a></li>"
+        f"<div><h5>Heizung</h5><canvas id='hzbar'></canvas>"
+        f"<script>{heating_script or script}</script>"
+        f"{comparison_div}</div>"
+        f"<div><h5>Warmwasser</h5><canvas id='wwbar'></canvas><script>{script}</script>"
+        "<div>Sie haben im Mai 2026 weniger als vergleichbare Haushalte verbraucht.</div></div>"
+        "</body></html>"
+    )
+
+
+class TestBuildMeterReportConsistency:
+    def test_average_kwh_without_sentence_raises(self) -> None:
+        # _chart_script() defaults to a non-zero average_kwh (65.0), so a
+        # comparison div lacking the "vergleichbare Haushalte" sentence is
+        # inconsistent and must fail fast.
+        html = _both_meters_html("<div>Keine Vergleichssätze hier.</div>")
+        with pytest.raises(ParseError, match="vs_average.*kWh value .* present but"):
+            parse_consumption_html(html)
+
+    def test_sentence_without_average_kwh_raises(self) -> None:
+        html = _both_meters_html(
+            "<div>Sie haben im Mai 2026 weniger als vergleichbare Haushalte verbraucht.</div>",
+            heating_script=_chart_script(avg_data="[null]"),
+        )
+        with pytest.raises(ParseError, match="vs_average.*comparison sentence present but"):
+            parse_consumption_html(html)
+
+    def test_zero_average_kwh_without_sentence_is_not_an_inconsistency(self) -> None:
+        # A 0 kWh value with no backing sentence is treated as "not present"
+        # rather than a genuine reading, since the portal cannot reliably be
+        # told apart here — this must not raise.
+        html = _both_meters_html(
+            "<div>Keine Vergleichssätze hier.</div>",
+            heating_script=_chart_script(avg_data="[0.0]"),
+        )
+        report = parse_consumption_html(html)
+        assert report.heating.average_kwh is None or report.heating.average_kwh == 0.0
+        assert report.heating.vs_average is None
+
+    def test_consistent_html_parses_without_error(self) -> None:
+        html = _both_meters_html(
+            "<div>Sie haben im Mai 2026 weniger als vergleichbare Haushalte verbraucht.</div>"
+        )
+        report = parse_consumption_html(html)
+        assert report.heating.vs_average is Comparison.LESS
+        assert report.hot_water.vs_average is Comparison.LESS
+
+
+# ---------------------------------------------------------------------------
+# _check_comparison_consistency
+# ---------------------------------------------------------------------------
+
+
+class TestCheckComparisonConsistency:
+    def test_kwh_present_and_sentence_present_is_consistent(self) -> None:
+        _check_comparison_consistency("label", 10.0, sentence_present=True)
+
+    def test_kwh_none_and_sentence_absent_is_consistent(self) -> None:
+        _check_comparison_consistency("label", None, sentence_present=False)
+
+    def test_kwh_present_and_sentence_absent_raises(self) -> None:
+        with pytest.raises(ParseError, match="present but comparison sentence is missing"):
+            _check_comparison_consistency("label", 10.0, sentence_present=False)
+
+    def test_kwh_none_and_sentence_present_raises(self) -> None:
+        with pytest.raises(ParseError, match="comparison sentence present but kWh value"):
+            _check_comparison_consistency("label", None, sentence_present=True)
+
+    def test_zero_kwh_and_sentence_absent_is_treated_as_not_present(self) -> None:
+        # A 0 kWh reading without a backing sentence is regarded as "value
+        # not present" rather than a genuine 0, so this must not raise.
+        _check_comparison_consistency("label", 0.0, sentence_present=False)
+
+    def test_zero_kwh_and_sentence_present_is_consistent(self) -> None:
+        _check_comparison_consistency("label", 0.0, sentence_present=True)
 
 
 # ---------------------------------------------------------------------------
@@ -489,11 +581,25 @@ class TestParseComparisons:
         assert result["vs_previous_month"] is Comparison.MORE
         assert result["vs_previous_year"] is Comparison.EQUAL
 
+    def test_sentence_without_direction_keyword_raises(self) -> None:
+        # A full "Sie haben im ... verbraucht." sentence that lacks any of the
+        # known direction keywords ("weniger"/"mehr"/"soviel") must fail fast
+        # rather than silently be dropped.
+        text = "Sie haben im Mai 2026 genauso als vergleichbare Haushalte verbraucht."
+        with pytest.raises(ParseError, match="recognized direction"):
+            _parse_comparisons(text, 5, 2026)
+
+
+_UNIT_TAB_HTML = (
+    "<li class='tab col s6 m3'><a href='#0001-001'>0001-001&nbsp;&nbsp;Max Mustermann</a></li>"
+)
+
 
 class TestParseObjectInfo:
     def test_label_without_value_sibling_is_skipped(self) -> None:
         soup = BeautifulSoup(
-            "<html><body><span class='field-label'>ausgewähltes Objekt</span></body></html>",
+            "<html><body><span class='field-label'>ausgewähltes Objekt</span>"
+            f"{_UNIT_TAB_HTML}</body></html>",
             "lxml",
         )
         info = _parse_object_info(soup)
@@ -509,19 +615,51 @@ class TestParseObjectInfo:
             "<span class='text-gray-600'>Musterstraße 1</span><br>"
             "<span class='text-gray-600'>12345 Musterstadt</span>"
             "</div>"
+            f"{_UNIT_TAB_HTML}"
             "</body></html>"
         )
         info = _parse_object_info(BeautifulSoup(html, "lxml"))
         assert info.object_number == "123-456"
         assert info.address == "Musterstraße 1, 12345 Musterstadt"
+        assert info.unit_id == "0001-001"
+        assert info.occupant_name == "Max Mustermann"
 
     def test_unrecognised_label_is_ignored(self) -> None:
         html = (
             "<html><body>"
             "<span class='field-label'>Sonstige Info</span>"
             "<div class='mt-1'><span class='field-value'>Wert</span></div>"
+            f"{_UNIT_TAB_HTML}"
             "</body></html>"
         )
         info = _parse_object_info(BeautifulSoup(html, "lxml"))
         assert info.object_number == ""
         assert info.address == ""
+
+    def test_missing_unit_tab_raises(self) -> None:
+        html = (
+            "<html><body>"
+            "<span class='field-label'>ausgewähltes Objekt</span>"
+            "<div class='mt-1'><span class='field-value'>123-456</span></div>"
+            "</body></html>"
+        )
+        with pytest.raises(ParseError, match="Unit tab"):
+            _parse_object_info(BeautifulSoup(html, "lxml"))
+
+    def test_malformed_unit_tab_identifier_raises(self) -> None:
+        html = (
+            "<html><body>"
+            "<li class='tab col s6 m3'><a href='#not-a-valid-id'>Max Mustermann</a></li>"
+            "</body></html>"
+        )
+        with pytest.raises(ParseError, match="Unexpected unit tab identifier format"):
+            _parse_object_info(BeautifulSoup(html, "lxml"))
+
+    def test_empty_occupant_name_raises(self) -> None:
+        html = (
+            "<html><body>"
+            "<li class='tab col s6 m3'><a href='#0001-001'>0001-001</a></li>"
+            "</body></html>"
+        )
+        with pytest.raises(ParseError, match="Occupant name not found"):
+            _parse_object_info(BeautifulSoup(html, "lxml"))

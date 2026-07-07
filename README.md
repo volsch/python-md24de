@@ -221,7 +221,7 @@ parsing the full report — note that it reflects the state at login time.
 
 | Field | Type | Description |
 |---|---|---|
-| `object_info` | `ObjectInfo` | Address and object number |
+| `object_info` | `ObjectInfo` | Address, object number, unit and occupant info |
 | `heating` | `MeterReport` | Heating consumption data |
 | `hot_water` | `MeterReport` | Hot-water consumption data |
 
@@ -231,6 +231,8 @@ parsing the full report — note that it reflects the state at login time.
 |---|---|---|
 | `object_number` | `str` | Property identifier assigned by the service provider |
 | `address` | `str` | Street address of the metered property |
+| `unit_id` | `str` | Identifier of the metered flat/unit as shown by the portal (e.g. `"0001-001"`) |
+| `occupant_name` | `str` | Name of the current tenant or owner of the unit (e.g. `"Max Mustermann"`) |
 
 #### `MeterReport`
 

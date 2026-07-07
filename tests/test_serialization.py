@@ -25,6 +25,8 @@ def report() -> ConsumptionReport:
         object_info=ObjectInfo(
             object_number="999-000001",
             address="Musterstraße 1, 12345 Musterstadt",
+            unit_id="0001-001",
+            occupant_name="Max Mustermann",
         ),
         heating=MeterReport(
             current_kwh=0.0,
@@ -81,7 +83,12 @@ class TestDumpConsumptionReport:
     def test_omits_none_kwh_values(self) -> None:
         """A missing (None) kwh value is omitted from JSON, like other None fields."""
         report = ConsumptionReport(
-            object_info=ObjectInfo(object_number="1", address="a"),
+            object_info=ObjectInfo(
+                object_number="1",
+                address="a",
+                unit_id="0001-001",
+                occupant_name="Max Mustermann",
+            ),
             heating=MeterReport(
                 current_kwh=None,
                 average_kwh=200.0,

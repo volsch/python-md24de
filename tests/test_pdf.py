@@ -32,6 +32,8 @@ def report() -> ConsumptionReport:
         object_info=ObjectInfo(
             object_number="999-000001",
             address="Musterstraße 1, 12345 Musterstadt",
+            unit_id="0001-001",
+            occupant_name="Max Mustermann",
         ),
         heating=MeterReport(
             current_kwh=0.0,
@@ -181,7 +183,12 @@ class TestRenderConsumptionReportPdf:
             history=(),
         )
         report = ConsumptionReport(
-            object_info=ObjectInfo(object_number="", address=""),
+            object_info=ObjectInfo(
+                object_number="",
+                address="",
+                unit_id="",
+                occupant_name="",
+            ),
             heating=empty_meter,
             hot_water=empty_meter,
         )

@@ -102,12 +102,24 @@ class TestMeterReport:
 
 class TestObjectInfo:
     def test_creation(self) -> None:
-        o = ObjectInfo(object_number="000-000000", address="Musterstr. 1, 12345 Berlin")
+        o = ObjectInfo(
+            object_number="000-000000",
+            address="Musterstr. 1, 12345 Berlin",
+            unit_id="0001-001",
+            occupant_name="Max Mustermann",
+        )
         assert o.object_number == "000-000000"
         assert o.address == "Musterstr. 1, 12345 Berlin"
+        assert o.unit_id == "0001-001"
+        assert o.occupant_name == "Max Mustermann"
 
     def test_frozen(self) -> None:
-        o = ObjectInfo(object_number="x", address="y")
+        o = ObjectInfo(
+            object_number="x",
+            address="y",
+            unit_id="0001-001",
+            occupant_name="Max Mustermann",
+        )
         with pytest.raises(AttributeError):
             o.object_number = "z"  # type: ignore[misc]
 
@@ -115,7 +127,12 @@ class TestObjectInfo:
 class TestConsumptionReport:
     def test_frozen(self) -> None:
         report = ConsumptionReport(
-            object_info=ObjectInfo(object_number="x", address="y"),
+            object_info=ObjectInfo(
+                object_number="x",
+                address="y",
+                unit_id="0001-001",
+                occupant_name="Max Mustermann",
+            ),
             heating=MeterReport(
                 current_kwh=0.0,
                 average_kwh=210.0,
@@ -134,4 +151,9 @@ class TestConsumptionReport:
             ),
         )
         with pytest.raises(AttributeError):
-            report.object_info = ObjectInfo(object_number="z", address="w")  # type: ignore[misc]
+            report.object_info = ObjectInfo(  # type: ignore[misc]
+                object_number="z",
+                address="w",
+                unit_id="0002-001",
+                occupant_name="Erika Musterfrau",
+            )

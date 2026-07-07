@@ -32,6 +32,8 @@ def sample_report() -> ConsumptionReport:
         object_info=ObjectInfo(
             object_number="000-000000",
             address="Musterstraße 1, 12345 Musterstadt",
+            unit_id="0001-001",
+            occupant_name="Max Mustermann",
         ),
         heating=MeterReport(
             current_kwh=15.0,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -87,6 +88,12 @@ _COMPARISON_SENTENCE_RE = re.compile(r"Sie haben im \w+ \d{4}.*?verbraucht\.")
 # verbraucht" comparison sentence ("als im" for weniger/mehr, "wie im" for
 # soviel/equal comparisons).
 _ALS_IM_RE = re.compile(r"(?:als|wie) im (\w+) (\d{4}) verbraucht")
+
+# Regex validating the portal's per-unit tab identifier format, e.g. "0001-001"
+# (flat/unit number, then a sequence number that increments whenever the
+# tenant/owner of that unit changes). Used only to validate the shape of the
+# identifier before returning it verbatim as ObjectInfo.unit_id.
+_UNIT_TAB_ID_RE = re.compile(r"^\d+-\d+$")
 
 _log = logging.getLogger(__name__)
 
@@ -364,7 +371,16 @@ def _parse_comparisons(
         sentence = match.group(0)
         direction = _parse_direction(sentence)
         if direction is None:
-            continue
+            # Every string matched by _COMPARISON_SENTENCE_RE is a full
+            # "Sie haben im ... verbraucht." comparison sentence, so it is
+            # expected to state a direction. If none of the known keywords
+            # ("weniger"/"mehr"/"soviel") appear, the portal's wording has
+            # changed in a way we don't recognise — fail fast rather than
+            # silently drop the comparison.
+            raise ParseError(
+                "Comparison sentence does not contain a recognized direction "
+                f"keyword ('weniger'/'mehr'/'soviel'): {sentence!r}"
+            )
         key = _classify_reference(sentence, current_month, current_year)
         if key is not None:
             results[key] = direction
@@ -429,14 +445,81 @@ def _build_meter_report(heading: Tag, chart: _ChartData) -> MeterReport:
     if isinstance(container, Tag):
         comparison_text = _find_comparison_text_in(container)
         comparisons = _parse_comparisons(comparison_text, chart.month, chart.year)
+
+    meter_name = heading.get_text(strip=True)
+    current = chart.readings[0]
+    previous_month_reading = _find_reading(
+        chart.readings, chart.month, chart.year, _is_previous_month
+    )
+    previous_year_reading = _find_reading(
+        chart.readings, chart.month, chart.year, _is_same_month_previous_year
+    )
+
+    _check_comparison_consistency(
+        f"{meter_name} vs_average",
+        current.average_kwh,
+        "vs_average" in comparisons,
+    )
+    _check_comparison_consistency(
+        f"{meter_name} vs_previous_month",
+        previous_month_reading.your_kwh if previous_month_reading is not None else None,
+        "vs_previous_month" in comparisons,
+    )
+    _check_comparison_consistency(
+        f"{meter_name} vs_previous_year",
+        previous_year_reading.your_kwh if previous_year_reading is not None else None,
+        "vs_previous_year" in comparisons,
+    )
+
     return MeterReport(
-        current_kwh=chart.readings[0].your_kwh,
-        average_kwh=chart.readings[0].average_kwh,
+        current_kwh=current.your_kwh,
+        average_kwh=current.average_kwh,
         vs_average=comparisons.get("vs_average"),
         vs_previous_month=comparisons.get("vs_previous_month"),
         vs_previous_year=comparisons.get("vs_previous_year"),
         history=tuple(chart.readings),
     )
+
+
+def _find_reading(
+    readings: list[MeterReading],
+    current_month: int,
+    current_year: int,
+    matches: Callable[[int, int, int, int], bool],
+) -> MeterReading | None:
+    """Return the reading for which *matches(current_month, current_year, r.month, r.year)*.
+
+    Used to locate the previous-month or same-month-previous-year reading (via
+    :func:`_is_previous_month` / :func:`_is_same_month_previous_year`) within the
+    chart's history window. Returns ``None`` if no such reading is present in the
+    window — this is the normal case when the portal's history simply doesn't
+    reach that far back, and is treated as "kWh value not available".
+    """
+    return next(
+        (r for r in readings if matches(current_month, current_year, r.month, r.year)),
+        None,
+    )
+
+
+def _check_comparison_consistency(
+    label: str,
+    kwh: float | None,
+    sentence_present: bool,
+) -> None:
+    """Raise :class:`ParseError` if *kwh* and *sentence_present* are inconsistent.
+
+    The two must agree in both directions: a present kWh value requires a
+    comparison sentence, and a comparison sentence requires a present kWh
+    value. A kWh value of exactly ``0`` is treated as "not present" when no
+    sentence backs it up — the portal is not known to reliably distinguish a
+    genuine 0 kWh reading from an absent one in the rendered text, so that
+    specific combination is not treated as an inconsistency.
+    """
+    effective_kwh_present = kwh is not None and not (kwh == 0 and not sentence_present)
+    if effective_kwh_present and not sentence_present:
+        raise ParseError(f"{label}: kWh value ({kwh}) present but comparison sentence is missing")
+    if sentence_present and kwh is None:
+        raise ParseError(f"{label}: comparison sentence present but kWh value is missing")
 
 
 def _parse_direction(text: str) -> Comparison | None:
@@ -501,7 +584,52 @@ def _parse_object_info(soup: BeautifulSoup) -> ObjectInfo:
         address = ", ".join(part for part in address_parts if part)
         break
 
-    return ObjectInfo(object_number=object_number, address=address)
+    unit_id, occupant_name = _parse_unit_occupant_info(soup)
+
+    return ObjectInfo(
+        object_number=object_number,
+        address=address,
+        unit_id=unit_id,
+        occupant_name=occupant_name,
+    )
+
+
+def _parse_unit_occupant_info(soup: BeautifulSoup) -> tuple[str, str]:
+    """Extract the unit identifier and occupant name from the selected unit tab.
+
+    The portal renders the currently selected flat/unit as a tab such as::
+
+        <li class="tab col s6 m3"><a href="#0001-001">0001-001&nbsp;&nbsp;Max Mustermann</a></li>
+
+    The tab's fragment identifier (``"0001-001"``) is returned verbatim as
+    :attr:`ObjectInfo.unit_id`; the occupant's name follows the identifier in
+    the link text, separated by non-breaking spaces.
+
+    Raises:
+        ParseError: If the tab cannot be found, its identifier does not match
+            the expected ``"<unit>-<sequence>"`` format, or the occupant name
+            is empty. Unlike the object number/address (which the portal may
+            legitimately omit), this data is expected to always be present, so
+            its absence indicates unexpected page structure rather than a
+            normal missing-field case.
+    """
+    tab_anchor = soup.find("li", class_="tab")
+    if isinstance(tab_anchor, Tag):
+        tab_anchor = tab_anchor.find("a")
+    if not isinstance(tab_anchor, Tag):
+        _log.log(_TRACE, "HTML where unit tab was not found:\n%s", _truncated(str(soup)))
+        raise ParseError("Unit tab (<li class='tab'><a href='#<unit>-<sequence>'>) not found")
+
+    unit_id = str(tab_anchor.get("href", "")).lstrip("#")
+    if not _UNIT_TAB_ID_RE.match(unit_id):
+        raise ParseError(f"Unexpected unit tab identifier format: {unit_id!r}")
+
+    # The link text is "<tab_id><nbsp><nbsp><name>" — strip the identifier
+    # prefix and any leading non-breaking/regular whitespace to get the name.
+    name = tab_anchor.get_text().removeprefix(unit_id).strip().strip("\xa0").strip()
+    if not name:
+        raise ParseError(f"Occupant name not found in unit tab {unit_id!r}")
+    return unit_id, name
 
 
 def _is_previous_month(
