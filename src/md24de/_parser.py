@@ -568,12 +568,12 @@ def _check_comparison_direction(
             f"{label}: comparison sentence ({comparison.value}) present but current "
             f"kWh ({current_kwh}) or reference kWh ({reference_kwh}) is missing"
         )
-    if comparison is Comparison.LESS and not current_kwh < reference_kwh:
+    if comparison is Comparison.LESS and current_kwh >= reference_kwh:
         raise ParseError(
             f"{label}: sentence says 'weniger' (less) but current kWh ({current_kwh}) "
             f"is not less than reference kWh ({reference_kwh})"
         )
-    if comparison is Comparison.MORE and not current_kwh > reference_kwh:
+    if comparison is Comparison.MORE and current_kwh <= reference_kwh:
         raise ParseError(
             f"{label}: sentence says 'mehr' (more) but current kWh ({current_kwh}) "
             f"is not greater than reference kWh ({reference_kwh})"
