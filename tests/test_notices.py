@@ -18,4 +18,5 @@ class TestGetUviDisclosureNote:
 
     def test_is_stable_across_calls(self) -> None:
         """The note is static/session-independent — every call returns the same text."""
-        assert get_uvi_disclosure_note() == get_uvi_disclosure_note()
+        note = get_uvi_disclosure_note()
+        assert get_uvi_disclosure_note() == note

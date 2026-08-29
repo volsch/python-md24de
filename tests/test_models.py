@@ -38,7 +38,9 @@ class TestAvailableMonth:
             m.month = 6  # type: ignore[misc]
 
     def test_equality(self) -> None:
-        assert AvailableMonth(year=2026, month=5) == AvailableMonth(year=2026, month=5)
+        m1 = AvailableMonth(year=2026, month=5)
+        m2 = AvailableMonth(year=2026, month=5)
+        assert m1 == m2
         assert AvailableMonth(year=2026, month=5) != AvailableMonth(year=2026, month=6)
 
     def test_hashable(self) -> None:
