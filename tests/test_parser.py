@@ -84,12 +84,18 @@ class TestParseConsumptionHtml:
     def test_heating_history_values(self, consumption_html: str) -> None:
         report = parse_consumption_html(consumption_html)
         h = report.heating.history
-        assert h[0].month == 5 and h[0].year == 2026
-        assert h[0].your_kwh == pytest.approx(15.0) and h[0].average_kwh == pytest.approx(210.0)
-        assert h[1].month == 4 and h[1].year == 2026
-        assert h[1].your_kwh == pytest.approx(145.0) and h[1].average_kwh == pytest.approx(305.0)
-        assert h[2].month == 5 and h[2].year == 2025
-        assert h[2].your_kwh == pytest.approx(140.0) and h[2].average_kwh == pytest.approx(210.0)
+        assert h[0].month == 5
+        assert h[0].year == 2026
+        assert h[0].your_kwh == pytest.approx(15.0)
+        assert h[0].average_kwh == pytest.approx(210.0)
+        assert h[1].month == 4
+        assert h[1].year == 2026
+        assert h[1].your_kwh == pytest.approx(145.0)
+        assert h[1].average_kwh == pytest.approx(305.0)
+        assert h[2].month == 5
+        assert h[2].year == 2025
+        assert h[2].your_kwh == pytest.approx(140.0)
+        assert h[2].average_kwh == pytest.approx(210.0)
 
     # ------------------------------------------------------------------
     # Hot water
@@ -122,12 +128,18 @@ class TestParseConsumptionHtml:
     def test_hot_water_history_values(self, consumption_html: str) -> None:
         report = parse_consumption_html(consumption_html)
         h = report.hot_water.history
-        assert h[0].month == 5 and h[0].year == 2026
-        assert h[0].your_kwh == pytest.approx(55.0) and h[0].average_kwh == pytest.approx(65.0)
-        assert h[1].month == 4 and h[1].year == 2026
-        assert h[1].your_kwh == pytest.approx(60.0) and h[1].average_kwh == pytest.approx(62.0)
-        assert h[2].month == 5 and h[2].year == 2025
-        assert h[2].your_kwh == pytest.approx(58.0) and h[2].average_kwh == pytest.approx(65.0)
+        assert h[0].month == 5
+        assert h[0].year == 2026
+        assert h[0].your_kwh == pytest.approx(55.0)
+        assert h[0].average_kwh == pytest.approx(65.0)
+        assert h[1].month == 4
+        assert h[1].year == 2026
+        assert h[1].your_kwh == pytest.approx(60.0)
+        assert h[1].average_kwh == pytest.approx(62.0)
+        assert h[2].month == 5
+        assert h[2].year == 2025
+        assert h[2].your_kwh == pytest.approx(58.0)
+        assert h[2].average_kwh == pytest.approx(65.0)
 
     # ------------------------------------------------------------------
     # History is newest-first
